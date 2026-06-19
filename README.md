@@ -2,10 +2,6 @@
 
 **An interactive data journalism project exploring alcohol consumption patterns across 193 countries**
 
-[![Live Demo](https://img.shields.io/badge/Live_Demo-View_Project-4A90D9?style=for-the-badge&logo=github)](https://myracorreia05.github.io/Global-Alcohol-Consumption-Data-Dashboard/)
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg?style=for-the-badge)](LICENSE)
-[![No Dependencies](https://img.shields.io/badge/Dependencies-Zero_Frameworks-brightgreen?style=for-the-badge)](drinks_deep.html)
-[![Data: WHO](https://img.shields.io/badge/Data-WHO_%2F_FiveThirtyEight-blue?style=for-the-badge)](https://fivethirtyeight.com/features/dear-mona-followup-where-do-people-drink-the-most-beer-wine-and-spirits/)
 
 ![PROOF Dashboard Preview](preview.png)
 
@@ -136,9 +132,6 @@ proof-drinks-viz/
 
 ## Dataset
 
-**Source:** [FiveThirtyEight — "Where Do People Drink The Most Beer, Wine And Spirits?"](https://fivethirtyeight.com/features/dear-mona-followup-where-do-people-drink-the-most-beer-wine-and-spirits/)
-
-**Original source:** WHO Global Status Report on Alcohol and Health
 
 | Column | Type | Description |
 |---|---|---|

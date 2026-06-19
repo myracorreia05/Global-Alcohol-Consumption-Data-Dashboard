@@ -1,0 +1,929 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Proof — A Data Study of What the World Drinks</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/d3/7.8.5/d3.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/topojson/3.0.2/topojson.min.js"></script>
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,600;1,300;1,400;1,600&family=JetBrains+Mono:wght@300;400;500&family=Instrument+Sans:wght@400;500&display=swap" rel="stylesheet">
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+:root{
+  --bg:#0e0c0a;
+  --bg2:#141210;
+  --bg3:#1a1714;
+  --surface:#201d19;
+  --border:rgba(255,240,200,0.08);
+  --border2:rgba(255,240,200,0.14);
+  --text:#f0ead8;
+  --muted:#8a7f6a;
+  --dim:#4a4238;
+  --beer:#d4931e;
+  --beer-dim:rgba(212,147,30,0.15);
+  --spirits:#c0392b;
+  --spirits-dim:rgba(192,57,43,0.15);
+  --wine:#8e44ad;
+  --wine-dim:rgba(142,68,173,0.15);
+  --gold:#d4b896;
+  --accent:#e8c97a;
+}
+
+html{scroll-behavior:smooth}
+body{background:var(--bg);color:var(--text);font-family:'Instrument Sans',sans-serif;overflow-x:hidden;line-height:1.6}
+
+/* ─ SCROLL PROGRESS ─ */
+#progress{position:fixed;top:0;left:0;height:2px;background:var(--accent);z-index:9999;transition:width 0.1s linear;width:0}
+
+/* ─ NAV ─ */
+nav{position:fixed;top:0;left:0;right:0;z-index:100;padding:0 48px;height:56px;display:flex;align-items:center;justify-content:space-between;background:rgba(14,12,10,0.85);backdrop-filter:blur(12px);border-bottom:1px solid var(--border)}
+.nav-brand{font-family:'Cormorant Garamond',serif;font-size:22px;font-weight:300;letter-spacing:0.05em;color:var(--accent)}
+.nav-links{display:flex;gap:32px}
+.nav-links a{font-family:'JetBrains Mono',monospace;font-size:10px;letter-spacing:0.2em;text-transform:uppercase;color:var(--muted);text-decoration:none;transition:color 0.2s}
+.nav-links a:hover{color:var(--text)}
+
+/* ─ HERO ─ */
+.hero{min-height:100vh;display:flex;flex-direction:column;justify-content:flex-end;padding:0 80px 80px;position:relative;overflow:hidden}
+.hero-bg{position:absolute;inset:0;background:radial-gradient(ellipse 70% 60% at 60% 40%,rgba(212,147,30,0.06) 0%,transparent 60%),radial-gradient(ellipse 50% 40% at 20% 80%,rgba(192,57,43,0.05) 0%,transparent 50%)}
+.hero-counter{position:absolute;top:50%;right:80px;transform:translateY(-50%);text-align:right}
+.hero-num{font-family:'Cormorant Garamond',serif;font-size:clamp(120px,18vw,220px);font-weight:300;line-height:1;color:transparent;-webkit-text-stroke:1px rgba(212,184,150,0.15);letter-spacing:-0.04em;user-select:none}
+.hero-eyebrow{font-family:'JetBrains Mono',monospace;font-size:11px;letter-spacing:0.25em;text-transform:uppercase;color:var(--accent);margin-bottom:20px;display:flex;align-items:center;gap:12px}
+.hero-eyebrow::before{content:'';display:block;width:40px;height:1px;background:var(--accent)}
+h1.hero-title{font-family:'Cormorant Garamond',serif;font-size:clamp(56px,9vw,130px);font-weight:300;line-height:0.9;letter-spacing:-0.03em;max-width:900px}
+h1.hero-title em{font-style:italic;color:var(--accent)}
+.hero-sub{margin-top:32px;max-width:520px;font-size:15px;font-weight:400;color:var(--muted);line-height:1.75}
+.hero-meta{display:flex;gap:40px;margin-top:40px;padding-top:32px;border-top:1px solid var(--border)}
+.hero-meta-item{}
+.hero-meta-label{font-family:'JetBrains Mono',monospace;font-size:9px;letter-spacing:0.2em;text-transform:uppercase;color:var(--dim);margin-bottom:4px}
+.hero-meta-val{font-family:'Cormorant Garamond',serif;font-size:28px;font-weight:300;color:var(--gold)}
+.hero-meta-unit{font-size:11px;color:var(--muted);margin-left:4px}
+.scroll-hint{position:absolute;bottom:40px;left:50%;transform:translateX(-50%);font-family:'JetBrains Mono',monospace;font-size:9px;letter-spacing:0.2em;color:var(--dim);display:flex;flex-direction:column;align-items:center;gap:8px;animation:bobble 2s ease-in-out infinite}
+.scroll-hint::after{content:'';display:block;width:1px;height:40px;background:linear-gradient(var(--dim),transparent)}
+@keyframes bobble{0%,100%{transform:translateX(-50%) translateY(0)}50%{transform:translateX(-50%) translateY(6px)}}
+
+/* ─ SECTION SKELETON ─ */
+.section{padding:120px 80px;border-top:1px solid var(--border);position:relative}
+.section-label{font-family:'JetBrains Mono',monospace;font-size:9px;letter-spacing:0.3em;text-transform:uppercase;color:var(--accent);margin-bottom:16px;display:flex;align-items:center;gap:12px}
+.section-label::before{content:attr(data-n);font-size:10px;color:var(--dim)}
+h2.section-title{font-family:'Cormorant Garamond',serif;font-size:clamp(36px,5vw,72px);font-weight:300;line-height:1.05;letter-spacing:-0.02em;margin-bottom:24px}
+h2.section-title em{font-style:italic;color:var(--accent)}
+.section-body{font-size:15px;color:var(--muted);line-height:1.8;max-width:640px;margin-bottom:56px}
+.section-body strong{color:var(--text);font-weight:500}
+.callout{border-left:2px solid var(--accent);padding:16px 24px;margin:32px 0;background:rgba(212,184,150,0.04)}
+.callout-text{font-family:'Cormorant Garamond',serif;font-size:22px;font-style:italic;line-height:1.5;color:var(--gold)}
+.callout-source{font-family:'JetBrains Mono',monospace;font-size:10px;color:var(--dim);margin-top:8px}
+
+/* ─ TWO-COL ─ */
+.two-col{display:grid;grid-template-columns:1fr 1fr;gap:64px;align-items:start}
+.three-col{display:grid;grid-template-columns:1fr 1fr 1fr;gap:32px}
+
+/* ─ STAT BLOCK ─ */
+.stat-block{padding:32px;border:1px solid var(--border);background:var(--surface);position:relative;overflow:hidden}
+.stat-block::before{content:'';position:absolute;top:0;left:0;right:0;height:2px;background:var(--sb-color,var(--accent))}
+.stat-num{font-family:'Cormorant Garamond',serif;font-size:56px;font-weight:300;line-height:1;color:var(--sb-color,var(--accent))}
+.stat-label{font-family:'JetBrains Mono',monospace;font-size:10px;letter-spacing:0.15em;text-transform:uppercase;color:var(--muted);margin-top:8px}
+.stat-note{font-size:12px;color:var(--dim);margin-top:8px;line-height:1.5}
+
+/* ─ CHART CONTAINERS ─ */
+.chart-wrap{width:100%;position:relative}
+.chart-title{font-family:'JetBrains Mono',monospace;font-size:10px;letter-spacing:0.15em;text-transform:uppercase;color:var(--muted);margin-bottom:16px;padding-bottom:12px;border-bottom:1px solid var(--border);display:flex;justify-content:space-between}
+.chart-note{font-family:'JetBrains Mono',monospace;font-size:9px;color:var(--dim);margin-top:10px}
+
+/* ─ BAR CHART (custom) ─ */
+.bar-chart{}
+.bar-row{display:grid;grid-template-columns:140px 1fr 52px;align-items:center;gap:12px;margin-bottom:8px;cursor:default}
+.bar-row:hover .bar-fill{filter:brightness(1.2)}
+.bar-name{font-size:12px;color:var(--muted);text-overflow:ellipsis;overflow:hidden;white-space:nowrap;text-align:right}
+.bar-track{height:8px;background:rgba(255,255,255,0.04);border-radius:4px;overflow:hidden;position:relative}
+.bar-fill{height:100%;border-radius:4px;transition:width 1s cubic-bezier(0.16,1,0.3,1);width:0}
+.bar-val{font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--muted);text-align:right}
+
+/* ─ STACKED BAR ─ */
+.stacked-row{display:grid;grid-template-columns:130px 1fr 60px;align-items:center;gap:12px;margin-bottom:10px}
+.stacked-name{font-size:12px;color:var(--muted);text-align:right;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.stacked-track{height:12px;background:rgba(255,255,255,0.04);border-radius:3px;overflow:hidden;display:flex}
+.stacked-seg{height:100%;transition:width 1s cubic-bezier(0.16,1,0.3,1);width:0}
+.stacked-total{font-family:'JetBrains Mono',monospace;font-size:10px;color:var(--muted);text-align:right}
+
+/* ─ MATRIX / HEATMAP ─ */
+.matrix-wrap{overflow-x:auto}
+.matrix-table{border-collapse:collapse;font-size:11px;width:100%}
+.matrix-table th{font-family:'JetBrains Mono',monospace;font-size:9px;letter-spacing:0.1em;text-transform:uppercase;color:var(--dim);padding:6px 10px;text-align:center;border-bottom:1px solid var(--border)}
+.matrix-table th:first-child{text-align:left}
+.matrix-table td{padding:8px 10px;border-bottom:1px solid var(--border);font-size:12px}
+.matrix-table td:first-child{color:var(--muted);font-size:12px}
+.matrix-table td:not(:first-child){text-align:center;font-family:'JetBrains Mono',monospace;font-size:11px;transition:background 0.3s}
+.heat-0{background:rgba(255,255,255,0.01);color:var(--dim)}
+.heat-1{background:rgba(212,147,30,0.12);color:rgba(212,147,30,0.6)}
+.heat-2{background:rgba(212,147,30,0.25);color:rgba(212,147,30,0.8)}
+.heat-3{background:rgba(212,147,30,0.45);color:#d4931e}
+.heat-4{background:rgba(212,147,30,0.65);color:#e8a832}
+.heat-5{background:rgba(212,147,30,0.85);color:#f0c060}
+
+/* ─ SCATTER (D3 SVG) ─ */
+#scatter-svg{width:100%;overflow:visible}
+
+/* ─ REGION CARDS ─ */
+.region-card{padding:28px;border:1px solid var(--border);background:var(--bg2);position:relative;overflow:hidden;cursor:default;transition:border-color 0.2s}
+.region-card:hover{border-color:var(--border2)}
+.region-card::after{content:'';position:absolute;bottom:0;left:0;right:0;height:3px;background:var(--rc-color,var(--dim))}
+.region-name{font-family:'Cormorant Garamond',serif;font-size:22px;font-weight:300;margin-bottom:4px}
+.region-count{font-family:'JetBrains Mono',monospace;font-size:9px;letter-spacing:0.15em;color:var(--dim);margin-bottom:20px;text-transform:uppercase}
+.region-avg{font-family:'Cormorant Garamond',serif;font-size:48px;font-weight:300;line-height:1;color:var(--rc-color,var(--gold))}
+.region-unit{font-size:12px;color:var(--muted);margin-left:4px}
+.region-bars{margin-top:16px;display:flex;flex-direction:column;gap:6px}
+.region-bar-row{display:flex;align-items:center;gap:8px;font-family:'JetBrains Mono',monospace;font-size:9px;color:var(--dim)}
+.region-bar-track{flex:1;height:3px;background:rgba(255,255,255,0.06);border-radius:2px;overflow:hidden}
+.region-bar-fill{height:100%;border-radius:2px;transition:width 1.2s cubic-bezier(0.16,1,0.3,1);width:0}
+.region-bar-val{width:28px;text-align:right}
+
+/* ─ SPOTLIGHT ─ */
+.spotlight-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:1px;background:var(--border)}
+.spotlight-cell{background:var(--bg2);padding:28px 24px;transition:background 0.2s;cursor:default}
+.spotlight-cell:hover{background:var(--bg3)}
+.sp-flag{font-size:32px;margin-bottom:12px}
+.sp-country{font-family:'Cormorant Garamond',serif;font-size:20px;font-weight:400;margin-bottom:4px}
+.sp-tag{display:inline-block;font-family:'JetBrains Mono',monospace;font-size:9px;letter-spacing:0.12em;text-transform:uppercase;padding:3px 8px;border-radius:2px;margin-bottom:14px}
+.sp-story{font-size:13px;color:var(--muted);line-height:1.65}
+.sp-nums{display:flex;gap:16px;margin-top:14px;padding-top:14px;border-top:1px solid var(--border)}
+.sp-num-item{flex:1}
+.sp-num-label{font-family:'JetBrains Mono',monospace;font-size:8px;letter-spacing:0.15em;text-transform:uppercase;color:var(--dim);margin-bottom:3px}
+.sp-num-val{font-family:'Cormorant Garamond',serif;font-size:22px;font-weight:300}
+
+/* ─ WORLD MAP ─ */
+#map-wrap{width:100%;position:relative}
+#map-svg{width:100%;display:block}
+.map-ctrls{display:flex;gap:8px;margin-bottom:24px;flex-wrap:wrap}
+.map-btn{font-family:'JetBrains Mono',monospace;font-size:9px;letter-spacing:0.18em;text-transform:uppercase;padding:7px 16px;border:1px solid var(--border);background:transparent;color:var(--muted);cursor:pointer;transition:all 0.15s}
+.map-btn:hover{border-color:var(--border2);color:var(--text)}
+.map-btn.on{border-color:var(--accent);background:rgba(212,184,150,0.08);color:var(--accent)}
+.map-legend{display:flex;align-items:center;gap:8px;margin-top:16px;font-family:'JetBrains Mono',monospace;font-size:9px;color:var(--dim)}
+.map-legend-bar{display:flex;height:8px;border-radius:2px;overflow:hidden;width:200px}
+
+/* ─ TOOLTIP ─ */
+.tt{position:fixed;background:var(--bg3);border:1px solid var(--border2);padding:14px 18px;font-size:12px;pointer-events:none;z-index:9000;display:none;min-width:180px;box-shadow:0 8px 40px rgba(0,0,0,0.6)}
+.tt-name{font-family:'Cormorant Garamond',serif;font-size:18px;font-weight:400;margin-bottom:10px;color:var(--text)}
+.tt-row{display:flex;justify-content:space-between;gap:24px;margin-top:4px;font-family:'JetBrains Mono',monospace;font-size:10px;color:var(--muted)}
+.tt-row span:last-child{color:var(--text)}
+
+/* ─ TREEMAP ─ */
+#treemap-svg{width:100%;display:block}
+
+/* ─ TABLE ─ */
+.tbl-controls{display:flex;gap:12px;margin-bottom:20px;align-items:center;flex-wrap:wrap}
+.tbl-search{background:var(--surface);border:1px solid var(--border);color:var(--text);font-family:'JetBrains Mono',monospace;font-size:12px;padding:9px 14px;outline:none;width:260px;transition:border 0.2s}
+.tbl-search:focus{border-color:var(--border2)}
+.tbl-filter{display:flex;gap:4px}
+.tbl-f-btn{font-family:'JetBrains Mono',monospace;font-size:9px;letter-spacing:0.12em;text-transform:uppercase;padding:7px 12px;border:1px solid var(--border);background:transparent;color:var(--muted);cursor:pointer;transition:all 0.15s}
+.tbl-f-btn:hover{color:var(--text)}
+.tbl-f-btn.on{background:var(--surface);color:var(--text);border-color:var(--border2)}
+.tbl-count{font-family:'JetBrains Mono',monospace;font-size:10px;color:var(--dim);margin-left:auto}
+table.dt{width:100%;border-collapse:collapse}
+table.dt thead th{font-family:'JetBrains Mono',monospace;font-size:9px;letter-spacing:0.18em;text-transform:uppercase;color:var(--dim);padding:10px 12px;text-align:left;border-bottom:1px solid var(--border);cursor:pointer;user-select:none;white-space:nowrap;transition:color 0.15s}
+table.dt thead th:hover{color:var(--muted)}
+table.dt thead th.sort-a::after{content:' ↑';color:var(--accent)}
+table.dt thead th.sort-d::after{content:' ↓';color:var(--accent)}
+table.dt tbody tr{border-bottom:1px solid var(--border);transition:background 0.12s;cursor:default}
+table.dt tbody tr:hover{background:var(--surface)}
+table.dt tbody td{padding:10px 12px;font-size:12px;color:var(--muted)}
+table.dt tbody td:first-child{color:var(--text);font-weight:500}
+table.dt tbody td.num{font-family:'JetBrains Mono',monospace;text-align:right;font-size:11px}
+.pill-dom{display:inline-block;font-family:'JetBrains Mono',monospace;font-size:8px;letter-spacing:0.1em;text-transform:uppercase;padding:2px 7px;border-radius:2px}
+.pill-beer{background:rgba(212,147,30,0.15);color:var(--beer)}
+.pill-spirits{background:rgba(192,57,43,0.15);color:var(--spirits)}
+.pill-wine{background:rgba(142,68,173,0.15);color:var(--wine)}
+.pill-none{background:rgba(255,255,255,0.04);color:var(--dim)}
+.mini-spark{display:inline-flex;gap:2px;align-items:flex-end;vertical-align:middle;margin-right:6px}
+.mini-spark span{display:inline-block;width:5px;border-radius:1px}
+.tbl-page{display:flex;justify-content:space-between;align-items:center;margin-top:16px;font-family:'JetBrains Mono',monospace;font-size:10px;color:var(--dim)}
+.tbl-pg-btns{display:flex;gap:4px}
+.pg-b{padding:4px 10px;border:1px solid var(--border);background:transparent;color:var(--muted);font-family:'JetBrains Mono',monospace;font-size:10px;cursor:pointer;transition:all 0.15s}
+.pg-b:hover,.pg-b.on{border-color:var(--accent);color:var(--accent)}
+
+/* ─ LEGEND ─ */
+.legend{display:flex;gap:24px;flex-wrap:wrap;margin-bottom:16px}
+.legend-item{display:flex;align-items:center;gap:7px;font-family:'JetBrains Mono',monospace;font-size:10px;color:var(--muted)}
+.legend-swatch{width:12px;height:12px;border-radius:2px}
+
+/* ─ FOOTER ─ */
+footer{padding:60px 80px 40px;border-top:1px solid var(--border)}
+.footer-top{display:flex;justify-content:space-between;align-items:flex-start;gap:40px;flex-wrap:wrap;margin-bottom:40px}
+.footer-brand{font-family:'Cormorant Garamond',serif;font-size:40px;font-weight:300;color:var(--gold)}
+.footer-desc{font-size:13px;color:var(--muted);line-height:1.7;max-width:380px;margin-top:8px}
+.footer-links{display:flex;flex-direction:column;gap:8px}
+.footer-links a{font-family:'JetBrains Mono',monospace;font-size:10px;letter-spacing:0.12em;color:var(--dim);text-decoration:none;transition:color 0.15s}
+.footer-links a:hover{color:var(--text)}
+.footer-bottom{display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:16px;padding-top:24px;border-top:1px solid var(--border)}
+.footer-copy{font-family:'JetBrains Mono',monospace;font-size:10px;color:var(--dim)}
+.tech-stack{display:flex;gap:8px;flex-wrap:wrap}
+.tech-tag{font-family:'JetBrains Mono',monospace;font-size:9px;letter-spacing:0.1em;border:1px solid var(--border);padding:3px 9px;color:var(--dim)}
+
+/* ─ ANIMATE ON SCROLL ─ */
+.reveal{opacity:0;transform:translateY(24px);transition:opacity 0.6s ease,transform 0.6s ease}
+.reveal.visible{opacity:1;transform:none}
+.reveal-delay-1{transition-delay:0.1s}
+.reveal-delay-2{transition-delay:0.2s}
+.reveal-delay-3{transition-delay:0.3s}
+.reveal-delay-4{transition-delay:0.4s}
+
+@media(max-width:900px){
+  .section,.hero{padding:80px 24px}
+  nav{padding:0 24px}
+  .nav-links{display:none}
+  .two-col,.three-col,.spotlight-grid{grid-template-columns:1fr}
+  .hero-counter{display:none}
+  footer{padding:40px 24px}
+  .footer-top{flex-direction:column}
+}
+</style>
+</head>
+<body>
+
+<div id="progress"></div>
+
+<nav>
+  <div class="nav-brand">PROOF</div>
+  <div class="nav-links">
+    <a href="#findings">Findings</a>
+    <a href="#regions">By Region</a>
+    <a href="#portraits">Portraits</a>
+    <a href="#map">World Map</a>
+    <a href="#data">Full Data</a>
+  </div>
+</nav>
+
+<!-- ═══ HERO ═══ -->
+<div class="hero" id="top">
+  <div class="hero-bg"></div>
+  <div class="hero-counter" aria-hidden="true">
+    <div class="hero-num" id="hero-count">193</div>
+  </div>
+  <div class="hero-eyebrow">A Data Study · WHO Global Report</div>
+  <h1 class="hero-title">What the<br>World <em>Drinks</em></h1>
+  <p class="hero-sub">An analysis of alcohol consumption across 193 nations — who drinks what, how much, and why the patterns reveal deep cultural, geographic, and economic divides.</p>
+  <div class="hero-meta">
+    <div class="hero-meta-item">
+      <div class="hero-meta-label">Countries studied</div>
+      <div class="hero-meta-val">193<span class="hero-meta-unit">nations</span></div>
+    </div>
+    <div class="hero-meta-item">
+      <div class="hero-meta-label">Heaviest drinker</div>
+      <div class="hero-meta-val">Belarus<span class="hero-meta-unit">14.4L / yr</span></div>
+    </div>
+    <div class="hero-meta-item">
+      <div class="hero-meta-label">Beer champion</div>
+      <div class="hero-meta-val">Namibia<span class="hero-meta-unit">376 servings</span></div>
+    </div>
+    <div class="hero-meta-item">
+      <div class="hero-meta-label">Spirit champion</div>
+      <div class="hero-meta-val">Grenada<span class="hero-meta-unit">438 servings</span></div>
+    </div>
+  </div>
+  <div class="scroll-hint">SCROLL</div>
+</div>
+
+<!-- ═══ SECTION 1: KEY FINDINGS ═══ -->
+<section class="section" id="findings">
+  <div class="section-label" data-n="01">Key Findings</div>
+  <h2 class="section-title reveal">The numbers that<br><em>surprised</em> us</h2>
+  <p class="section-body reveal">The dataset — drawn from the WHO Global Status Report — measures per-person annual consumption across beer, spirits, and wine for 193 countries. What emerges isn't just a list of statistics. It's a map of culture, religion, history, and climate painted in servings per year.</p>
+
+  <div class="three-col" style="margin-bottom:48px">
+    <div class="stat-block reveal reveal-delay-1" style="--sb-color:var(--beer)">
+      <div class="stat-num">52%</div>
+      <div class="stat-label">Nations where beer dominates</div>
+      <div class="stat-note">101 of 180 drinking countries choose beer as their primary beverage — the universal language of alcohol.</div>
+    </div>
+    <div class="stat-block reveal reveal-delay-2" style="--sb-color:var(--spirits)">
+      <div class="stat-num">13</div>
+      <div class="stat-label">Countries reporting zero</div>
+      <div class="stat-note">Afghanistan, Iran, Pakistan, and 10 others report zero consumption — mostly majority-Muslim nations where alcohol is culturally or legally prohibited.</div>
+    </div>
+    <div class="stat-block reveal reveal-delay-3" style="--sb-color:var(--wine)">
+      <div class="stat-num">3.7×</div>
+      <div class="stat-label">Europe vs. Asia gap</div>
+      <div class="stat-note">Europe averages 8.7L pure alcohol per person per year. Asia averages just 2.0L — a 3.7× difference driven by culture, religion, and income.</div>
+    </div>
+  </div>
+
+  <div class="callout reveal">
+    <div class="callout-text">"Belarus consumes 14.4 litres of pure alcohol per person per year — nearly triple the global average of 4.7L, and more than any country on Earth."</div>
+    <div class="callout-source">— Analysis of WHO Dataset, 193 nations</div>
+  </div>
+
+  <div class="two-col" style="margin-top:56px">
+    <div class="reveal">
+      <div class="chart-title chart-wrap">
+        <span>Top 15 — Total alcohol consumption</span>
+        <span>Litres pure alcohol / person / year</span>
+      </div>
+      <div class="bar-chart" id="bar-total"></div>
+      <div class="legend" style="margin-top:16px">
+        <div class="legend-item"><div class="legend-swatch" style="background:var(--beer)"></div>Beer dominant</div>
+        <div class="legend-item"><div class="legend-swatch" style="background:var(--spirits)"></div>Spirits dominant</div>
+        <div class="legend-item"><div class="legend-swatch" style="background:var(--wine)"></div>Wine dominant</div>
+      </div>
+      <div class="chart-note">Bar colour indicates the country's dominant drink category</div>
+    </div>
+    <div class="reveal reveal-delay-1">
+      <div class="chart-title chart-wrap">
+        <span>Composition — beer + spirits + wine</span>
+        <span>Top 12 drinkers</span>
+      </div>
+      <div id="stacked-chart"></div>
+      <div class="legend" style="margin-top:16px">
+        <div class="legend-item"><div class="legend-swatch" style="background:var(--beer)"></div>Beer</div>
+        <div class="legend-item"><div class="legend-swatch" style="background:var(--spirits)"></div>Spirits</div>
+        <div class="legend-item"><div class="legend-swatch" style="background:var(--wine)"></div>Wine</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ═══ SECTION 2: REGIONS ═══ -->
+<section class="section" id="regions">
+  <div class="section-label" data-n="02">Regional Analysis</div>
+  <h2 class="section-title reveal">Five worlds,<br><em>five cultures</em></h2>
+  <p class="section-body reveal">Geography is destiny when it comes to drinking. Europe's <strong>cold climates and pub traditions</strong> push averages to 8.7L. The Americas split between beer-loving Central/South nations and spirit-heavy Caribbean islands. Asia's average is dragged down by large Muslim-majority populations. Africa surprises — higher than Asia, with beer culture in sub-Saharan countries like Namibia and Gabon.</p>
+
+  <div id="region-cards" class="three-col" style="gap:16px;margin-bottom:56px"></div>
+
+  <div class="two-col reveal">
+    <div>
+      <div class="chart-title chart-wrap">
+        <span>Regional average — beer · spirits · wine</span>
+        <span>Servings / person / year</span>
+      </div>
+      <div id="region-bar-chart"></div>
+    </div>
+    <div>
+      <p style="font-size:15px;color:var(--muted);line-height:1.8;margin-bottom:24px">
+        <strong style="color:var(--text)">The European Exception.</strong> Europe is the only region where wine holds comparable weight to beer and spirits. Countries like France (370 wine servings), Portugal (339), and Slovenia (276) drive the average up dramatically.
+      </p>
+      <p style="font-size:15px;color:var(--muted);line-height:1.8;margin-bottom:24px">
+        <strong style="color:var(--text)">The African Surprise.</strong> Sub-Saharan Africa out-drinks Asia. Countries like Gabon (347 beer), Namibia (376 beer), and Nigeria (9.1L total) push the continent's average higher than many expect — despite strong Islamic influence in North Africa pulling the average down.
+      </p>
+      <p style="font-size:15px;color:var(--muted);line-height:1.8">
+        <strong style="color:var(--text)">The Caribbean Paradox.</strong> Small island nations — Grenada, Haiti, St. Lucia — rank among the world's heaviest drinkers. Rum and sugarcane spirit production shapes local consumption patterns profoundly.
+      </p>
+    </div>
+  </div>
+</section>
+
+<!-- ═══ SECTION 3: PORTRAITS ═══ -->
+<section class="section" id="portraits">
+  <div class="section-label" data-n="03">Country Portraits</div>
+  <h2 class="section-title reveal">The <em>outliers</em><br>that tell the story</h2>
+  <p class="section-body reveal">Every country has a drinking identity. Some are extreme mono-cultures — nearly all beer, or nearly all spirits. Others are balanced. These nine portraits illustrate the range of human habit across the globe.</p>
+
+  <div class="spotlight-grid reveal" id="spotlight-grid"></div>
+
+  <div style="margin-top:56px" class="reveal">
+    <div class="chart-title chart-wrap">
+      <span>Beer vs. Spirits — all 193 countries</span>
+      <span>Each dot = one country · hover for details</span>
+    </div>
+    <svg id="scatter-svg" viewBox="0 0 800 440" style="background:var(--bg2);border:1px solid var(--border)"></svg>
+    <div class="legend" style="margin-top:12px">
+      <div class="legend-item"><div class="legend-swatch" style="background:var(--beer)"></div>Beer dominant</div>
+      <div class="legend-item"><div class="legend-swatch" style="background:var(--spirits)"></div>Spirits dominant</div>
+      <div class="legend-item"><div class="legend-swatch" style="background:var(--wine)"></div>Wine dominant</div>
+      <div class="legend-item"><div class="legend-swatch" style="background:var(--dim)"></div>No alcohol</div>
+    </div>
+    <div class="chart-note">Circle area proportional to total alcohol consumption (litres)</div>
+  </div>
+
+  <div style="margin-top:56px" class="reveal">
+    <div class="chart-title chart-wrap">
+      <span>Consumption distribution — all countries</span>
+      <span>Litres pure alcohol per person / year</span>
+    </div>
+    <svg id="dist-svg" viewBox="0 0 800 180" style="width:100%"></svg>
+    <div class="chart-note" style="display:flex;justify-content:space-between"><span>0L (dry)</span><span>Global avg: 4.7L ▲</span><span>14.4L (Belarus)</span></div>
+  </div>
+</section>
+
+<!-- ═══ SECTION 4: DRINK TYPES ═══ -->
+<section class="section" id="drinks">
+  <div class="section-label" data-n="04">By Drink Type</div>
+  <h2 class="section-title reveal">Beer, spirits, wine —<br><em>who leads each?</em></h2>
+
+  <div class="two-col reveal">
+    <div>
+      <div class="chart-title chart-wrap"><span>🍺 Top beer nations</span><span>Servings / year</span></div>
+      <div class="bar-chart" id="bar-beer"></div>
+    </div>
+    <div>
+      <div class="chart-title chart-wrap"><span>🥃 Top spirit nations</span><span>Servings / year</span></div>
+      <div class="bar-chart" id="bar-spirits"></div>
+    </div>
+  </div>
+
+  <div style="margin-top:40px" class="reveal">
+    <div class="chart-title chart-wrap"><span>🍷 Top wine nations</span><span>Servings / year · top 16</span></div>
+    <div class="bar-chart" id="bar-wine"></div>
+  </div>
+
+  <div style="margin-top:48px" class="reveal">
+    <p class="section-body" style="margin-bottom:24px"><strong>The Heatmap.</strong> How do the top 20 nations compare across all three drink types? Darker cells mean higher consumption relative to the global peak.</p>
+    <div class="matrix-wrap">
+      <table class="matrix-table" id="heatmap-table"></table>
+    </div>
+  </div>
+</section>
+
+<!-- ═══ SECTION 5: MAP ═══ -->
+<section class="section" id="map" style="padding-bottom:0">
+  <div class="section-label" data-n="05">World Map</div>
+  <h2 class="section-title reveal">Painted by the <em>glass</em></h2>
+  <p class="section-body reveal">Hover any country for its drinking profile. Switch between metrics to see how each drink type has its own distinct geography — wine hugging the Mediterranean, spirits dominating Eastern Europe and the Caribbean, beer spreading broadly across Africa and Central Europe.</p>
+  <div class="map-ctrls">
+    <button class="map-btn on" onclick="setMap('total',this)">Total Alcohol</button>
+    <button class="map-btn" onclick="setMap('beer',this)">Beer</button>
+    <button class="map-btn" onclick="setMap('spirits',this)">Spirits</button>
+    <button class="map-btn" onclick="setMap('wine',this)">Wine</button>
+  </div>
+  <div id="map-wrap">
+    <div style="padding:40px;text-align:center;font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--dim)" id="map-loading">Loading world map…</div>
+  </div>
+  <div class="map-legend" id="map-legend"></div>
+</section>
+
+<!-- ═══ SECTION 6: FULL DATA ═══ -->
+<section class="section" id="data">
+  <div class="section-label" data-n="06">Full Dataset</div>
+  <h2 class="section-title reveal">All 193 nations —<br><em>explore the data</em></h2>
+
+  <div class="tbl-controls reveal">
+    <input class="tbl-search" id="tbl-search" type="text" placeholder="Search country…" oninput="updateTable()">
+    <div class="tbl-filter" id="tbl-filter">
+      <button class="tbl-f-btn on" onclick="setFilter('all',this)">All</button>
+      <button class="tbl-f-btn" onclick="setFilter('Europe',this)">Europe</button>
+      <button class="tbl-f-btn" onclick="setFilter('Americas',this)">Americas</button>
+      <button class="tbl-f-btn" onclick="setFilter('Asia',this)">Asia</button>
+      <button class="tbl-f-btn" onclick="setFilter('Africa',this)">Africa</button>
+      <button class="tbl-f-btn" onclick="setFilter('Oceania',this)">Oceania</button>
+    </div>
+    <div class="tbl-count" id="tbl-count">193 countries</div>
+  </div>
+
+  <div class="reveal">
+    <table class="dt" id="main-table">
+      <thead>
+        <tr>
+          <th onclick="sortTable('country')" id="th-country">Country</th>
+          <th onclick="sortTable('region')" id="th-region">Region</th>
+          <th onclick="sortTable('dominant')" id="th-dominant">Dominant</th>
+          <th onclick="sortTable('beer_servings')" id="th-beer" style="text-align:right">Beer ↕</th>
+          <th onclick="sortTable('spirit_servings')" id="th-spirits" style="text-align:right">Spirits ↕</th>
+          <th onclick="sortTable('wine_servings')" id="th-wine" style="text-align:right">Wine ↕</th>
+          <th onclick="sortTable('total_litres_of_pure_alcohol')" id="th-total" style="text-align:right">Total L ↕</th>
+        </tr>
+      </thead>
+      <tbody id="tbl-body"></tbody>
+    </table>
+    <div class="tbl-page">
+      <span id="tbl-page-info"></span>
+      <div class="tbl-pg-btns" id="tbl-pg-btns"></div>
+    </div>
+  </div>
+</section>
+
+<!-- ═══ FOOTER ═══ -->
+<footer>
+  <div class="footer-top">
+    <div>
+      <div class="footer-brand">PROOF</div>
+      <div class="footer-desc">A data journalism project exploring global alcohol consumption patterns using WHO data for 193 countries. Built as a portfolio demonstration of data visualisation, frontend engineering, and analytical storytelling.</div>
+    </div>
+    <div class="footer-links">
+      <a href="https://fivethirtyeight.com/features/dear-mona-followup-where-do-people-drink-the-most-beer-wine-and-spirits/" target="_blank">↗ FiveThirtyEight Source</a>
+      <a href="https://www.who.int/publications/i/item/9789241565639" target="_blank">↗ WHO Global Status Report</a>
+      <a href="https://github.com" target="_blank">↗ View on GitHub</a>
+    </div>
+  </div>
+  <div class="footer-bottom">
+    <div class="footer-copy">Data: WHO / FiveThirtyEight · Visualisation: D3.js, custom JS · No frameworks</div>
+    <div class="tech-stack">
+      <span class="tech-tag">HTML5</span>
+      <span class="tech-tag">CSS3</span>
+      <span class="tech-tag">Vanilla JS</span>
+      <span class="tech-tag">D3.js v7</span>
+      <span class="tech-tag">TopoJSON</span>
+      <span class="tech-tag">Choropleth</span>
+      <span class="tech-tag">Scatter</span>
+      <span class="tech-tag">Data Analysis</span>
+    </div>
+  </div>
+</footer>
+
+<div class="tt" id="tooltip">
+  <div class="tt-name" id="tt-name"></div>
+  <div class="tt-row"><span>Region</span><span id="tt-region"></span></div>
+  <div class="tt-row"><span>Beer</span><span id="tt-beer"></span></div>
+  <div class="tt-row"><span>Spirits</span><span id="tt-spirits"></span></div>
+  <div class="tt-row"><span>Wine</span><span id="tt-wine"></span></div>
+  <div class="tt-row"><span>Total alcohol</span><span id="tt-total"></span></div>
+  <div class="tt-row"><span>Dominant</span><span id="tt-dom"></span></div>
+</div>
+
+<script>
+// ════════════════════════════════════════
+// DATA
+// ════════════════════════════════════════
+const RAW = [{"country":"Afghanistan","beer_servings":0,"spirit_servings":0,"wine_servings":0,"total_litres_of_pure_alcohol":0.0,"region":"Asia","dominant":"none"},{"country":"Albania","beer_servings":89,"spirit_servings":132,"wine_servings":54,"total_litres_of_pure_alcohol":4.9,"region":"Europe","dominant":"spirits"},{"country":"Algeria","beer_servings":25,"spirit_servings":0,"wine_servings":14,"total_litres_of_pure_alcohol":0.7,"region":"Africa","dominant":"beer"},{"country":"Andorra","beer_servings":245,"spirit_servings":138,"wine_servings":312,"total_litres_of_pure_alcohol":12.4,"region":"Europe","dominant":"wine"},{"country":"Angola","beer_servings":217,"spirit_servings":57,"wine_servings":45,"total_litres_of_pure_alcohol":5.9,"region":"Africa","dominant":"beer"},{"country":"Antigua & Barbuda","beer_servings":102,"spirit_servings":128,"wine_servings":45,"total_litres_of_pure_alcohol":4.9,"region":"Americas","dominant":"spirits"},{"country":"Argentina","beer_servings":193,"spirit_servings":25,"wine_servings":221,"total_litres_of_pure_alcohol":8.3,"region":"Americas","dominant":"wine"},{"country":"Armenia","beer_servings":21,"spirit_servings":179,"wine_servings":11,"total_litres_of_pure_alcohol":3.8,"region":"Europe","dominant":"spirits"},{"country":"Australia","beer_servings":261,"spirit_servings":72,"wine_servings":212,"total_litres_of_pure_alcohol":10.4,"region":"Oceania","dominant":"beer"},{"country":"Austria","beer_servings":279,"spirit_servings":75,"wine_servings":191,"total_litres_of_pure_alcohol":9.7,"region":"Europe","dominant":"beer"},{"country":"Azerbaijan","beer_servings":21,"spirit_servings":46,"wine_servings":5,"total_litres_of_pure_alcohol":1.3,"region":"Asia","dominant":"spirits"},{"country":"Bahamas","beer_servings":122,"spirit_servings":176,"wine_servings":51,"total_litres_of_pure_alcohol":6.3,"region":"Americas","dominant":"spirits"},{"country":"Bahrain","beer_servings":42,"spirit_servings":63,"wine_servings":7,"total_litres_of_pure_alcohol":2.0,"region":"Asia","dominant":"spirits"},{"country":"Bangladesh","beer_servings":0,"spirit_servings":0,"wine_servings":0,"total_litres_of_pure_alcohol":0.0,"region":"Asia","dominant":"none"},{"country":"Barbados","beer_servings":143,"spirit_servings":173,"wine_servings":36,"total_litres_of_pure_alcohol":6.3,"region":"Americas","dominant":"spirits"},{"country":"Belarus","beer_servings":142,"spirit_servings":373,"wine_servings":42,"total_litres_of_pure_alcohol":14.4,"region":"Europe","dominant":"spirits"},{"country":"Belgium","beer_servings":295,"spirit_servings":84,"wine_servings":212,"total_litres_of_pure_alcohol":10.5,"region":"Europe","dominant":"beer"},{"country":"Belize","beer_servings":263,"spirit_servings":114,"wine_servings":8,"total_litres_of_pure_alcohol":6.8,"region":"Americas","dominant":"beer"},{"country":"Benin","beer_servings":34,"spirit_servings":4,"wine_servings":13,"total_litres_of_pure_alcohol":1.1,"region":"Africa","dominant":"beer"},{"country":"Bhutan","beer_servings":23,"spirit_servings":0,"wine_servings":0,"total_litres_of_pure_alcohol":0.4,"region":"Asia","dominant":"beer"},{"country":"Bolivia","beer_servings":167,"spirit_servings":41,"wine_servings":8,"total_litres_of_pure_alcohol":3.8,"region":"Americas","dominant":"beer"},{"country":"Bosnia-Herzegovina","beer_servings":76,"spirit_servings":173,"wine_servings":8,"total_litres_of_pure_alcohol":4.6,"region":"Europe","dominant":"spirits"},{"country":"Botswana","beer_servings":173,"spirit_servings":35,"wine_servings":35,"total_litres_of_pure_alcohol":5.4,"region":"Africa","dominant":"beer"},{"country":"Brazil","beer_servings":245,"spirit_servings":145,"wine_servings":16,"total_litres_of_pure_alcohol":7.2,"region":"Americas","dominant":"beer"},{"country":"Brunei","beer_servings":31,"spirit_servings":2,"wine_servings":1,"total_litres_of_pure_alcohol":0.6,"region":"Asia","dominant":"beer"},{"country":"Bulgaria","beer_servings":231,"spirit_servings":252,"wine_servings":94,"total_litres_of_pure_alcohol":10.3,"region":"Europe","dominant":"spirits"},{"country":"Burkina Faso","beer_servings":25,"spirit_servings":7,"wine_servings":7,"total_litres_of_pure_alcohol":4.3,"region":"Africa","dominant":"beer"},{"country":"Burundi","beer_servings":88,"spirit_servings":0,"wine_servings":0,"total_litres_of_pure_alcohol":6.3,"region":"Africa","dominant":"beer"},{"country":"Cote d'Ivoire","beer_servings":37,"spirit_servings":1,"wine_servings":7,"total_litres_of_pure_alcohol":4.0,"region":"Africa","dominant":"beer"},{"country":"Cabo Verde","beer_servings":144,"spirit_servings":56,"wine_servings":16,"total_litres_of_pure_alcohol":4.0,"region":"Africa","dominant":"beer"},{"country":"Cambodia","beer_servings":57,"spirit_servings":65,"wine_servings":1,"total_litres_of_pure_alcohol":2.2,"region":"Asia","dominant":"spirits"},{"country":"Cameroon","beer_servings":147,"spirit_servings":1,"wine_servings":4,"total_litres_of_pure_alcohol":5.8,"region":"Africa","dominant":"beer"},{"country":"Canada","beer_servings":240,"spirit_servings":122,"wine_servings":100,"total_litres_of_pure_alcohol":8.2,"region":"Americas","dominant":"beer"},{"country":"Central African Republic","beer_servings":17,"spirit_servings":2,"wine_servings":1,"total_litres_of_pure_alcohol":1.8,"region":"Africa","dominant":"beer"},{"country":"Chad","beer_servings":15,"spirit_servings":1,"wine_servings":1,"total_litres_of_pure_alcohol":0.4,"region":"Africa","dominant":"beer"},{"country":"Chile","beer_servings":130,"spirit_servings":124,"wine_servings":172,"total_litres_of_pure_alcohol":7.6,"region":"Americas","dominant":"wine"},{"country":"China","beer_servings":79,"spirit_servings":192,"wine_servings":8,"total_litres_of_pure_alcohol":5.0,"region":"Asia","dominant":"spirits"},{"country":"Colombia","beer_servings":159,"spirit_servings":76,"wine_servings":3,"total_litres_of_pure_alcohol":4.2,"region":"Americas","dominant":"beer"},{"country":"Comoros","beer_servings":1,"spirit_servings":3,"wine_servings":1,"total_litres_of_pure_alcohol":0.1,"region":"Africa","dominant":"spirits"},{"country":"Congo","beer_servings":76,"spirit_servings":1,"wine_servings":9,"total_litres_of_pure_alcohol":1.7,"region":"Africa","dominant":"beer"},{"country":"Cook Islands","beer_servings":0,"spirit_servings":254,"wine_servings":74,"total_litres_of_pure_alcohol":5.9,"region":"Oceania","dominant":"spirits"},{"country":"Costa Rica","beer_servings":149,"spirit_servings":87,"wine_servings":11,"total_litres_of_pure_alcohol":4.4,"region":"Americas","dominant":"beer"},{"country":"Croatia","beer_servings":230,"spirit_servings":87,"wine_servings":254,"total_litres_of_pure_alcohol":10.2,"region":"Europe","dominant":"wine"},{"country":"Cuba","beer_servings":93,"spirit_servings":137,"wine_servings":5,"total_litres_of_pure_alcohol":4.2,"region":"Americas","dominant":"spirits"},{"country":"Cyprus","beer_servings":192,"spirit_servings":154,"wine_servings":113,"total_litres_of_pure_alcohol":8.2,"region":"Europe","dominant":"beer"},{"country":"Czech Republic","beer_servings":361,"spirit_servings":170,"wine_servings":134,"total_litres_of_pure_alcohol":11.8,"region":"Europe","dominant":"beer"},{"country":"North Korea","beer_servings":0,"spirit_servings":0,"wine_servings":0,"total_litres_of_pure_alcohol":0.0,"region":"Asia","dominant":"none"},{"country":"DR Congo","beer_servings":32,"spirit_servings":3,"wine_servings":1,"total_litres_of_pure_alcohol":2.3,"region":"Africa","dominant":"beer"},{"country":"Denmark","beer_servings":224,"spirit_servings":81,"wine_servings":278,"total_litres_of_pure_alcohol":10.4,"region":"Europe","dominant":"wine"},{"country":"Djibouti","beer_servings":15,"spirit_servings":44,"wine_servings":3,"total_litres_of_pure_alcohol":1.1,"region":"Africa","dominant":"spirits"},{"country":"Dominica","beer_servings":52,"spirit_servings":286,"wine_servings":26,"total_litres_of_pure_alcohol":6.6,"region":"Americas","dominant":"spirits"},{"country":"Dominican Republic","beer_servings":193,"spirit_servings":147,"wine_servings":9,"total_litres_of_pure_alcohol":6.2,"region":"Americas","dominant":"beer"},{"country":"Ecuador","beer_servings":162,"spirit_servings":74,"wine_servings":3,"total_litres_of_pure_alcohol":4.2,"region":"Americas","dominant":"beer"},{"country":"Egypt","beer_servings":6,"spirit_servings":4,"wine_servings":1,"total_litres_of_pure_alcohol":0.2,"region":"Africa","dominant":"beer"},{"country":"El Salvador","beer_servings":52,"spirit_servings":69,"wine_servings":2,"total_litres_of_pure_alcohol":2.2,"region":"Americas","dominant":"spirits"},{"country":"Equatorial Guinea","beer_servings":92,"spirit_servings":0,"wine_servings":233,"total_litres_of_pure_alcohol":5.8,"region":"Africa","dominant":"wine"},{"country":"Eritrea","beer_servings":18,"spirit_servings":0,"wine_servings":0,"total_litres_of_pure_alcohol":0.5,"region":"Africa","dominant":"beer"},{"country":"Estonia","beer_servings":224,"spirit_servings":194,"wine_servings":59,"total_litres_of_pure_alcohol":9.5,"region":"Europe","dominant":"beer"},{"country":"Ethiopia","beer_servings":20,"spirit_servings":3,"wine_servings":0,"total_litres_of_pure_alcohol":0.7,"region":"Africa","dominant":"beer"},{"country":"Fiji","beer_servings":77,"spirit_servings":35,"wine_servings":1,"total_litres_of_pure_alcohol":2.0,"region":"Oceania","dominant":"beer"},{"country":"Finland","beer_servings":263,"spirit_servings":133,"wine_servings":97,"total_litres_of_pure_alcohol":10.0,"region":"Europe","dominant":"beer"},{"country":"France","beer_servings":127,"spirit_servings":151,"wine_servings":370,"total_litres_of_pure_alcohol":11.8,"region":"Europe","dominant":"wine"},{"country":"Gabon","beer_servings":347,"spirit_servings":98,"wine_servings":59,"total_litres_of_pure_alcohol":8.9,"region":"Africa","dominant":"beer"},{"country":"Gambia","beer_servings":8,"spirit_servings":0,"wine_servings":1,"total_litres_of_pure_alcohol":2.4,"region":"Africa","dominant":"beer"},{"country":"Georgia","beer_servings":52,"spirit_servings":100,"wine_servings":149,"total_litres_of_pure_alcohol":5.4,"region":"Europe","dominant":"wine"},{"country":"Germany","beer_servings":346,"spirit_servings":117,"wine_servings":175,"total_litres_of_pure_alcohol":11.3,"region":"Europe","dominant":"beer"},{"country":"Ghana","beer_servings":31,"spirit_servings":3,"wine_servings":10,"total_litres_of_pure_alcohol":1.8,"region":"Africa","dominant":"beer"},{"country":"Greece","beer_servings":133,"spirit_servings":112,"wine_servings":218,"total_litres_of_pure_alcohol":8.3,"region":"Europe","dominant":"wine"},{"country":"Grenada","beer_servings":199,"spirit_servings":438,"wine_servings":28,"total_litres_of_pure_alcohol":11.9,"region":"Americas","dominant":"spirits"},{"country":"Guatemala","beer_servings":53,"spirit_servings":69,"wine_servings":2,"total_litres_of_pure_alcohol":2.2,"region":"Americas","dominant":"spirits"},{"country":"Guinea","beer_servings":9,"spirit_servings":0,"wine_servings":2,"total_litres_of_pure_alcohol":0.2,"region":"Africa","dominant":"beer"},{"country":"Guinea-Bissau","beer_servings":28,"spirit_servings":31,"wine_servings":21,"total_litres_of_pure_alcohol":2.5,"region":"Africa","dominant":"spirits"},{"country":"Guyana","beer_servings":93,"spirit_servings":302,"wine_servings":1,"total_litres_of_pure_alcohol":7.1,"region":"Americas","dominant":"spirits"},{"country":"Haiti","beer_servings":1,"spirit_servings":326,"wine_servings":1,"total_litres_of_pure_alcohol":5.9,"region":"Americas","dominant":"spirits"},{"country":"Honduras","beer_servings":69,"spirit_servings":98,"wine_servings":2,"total_litres_of_pure_alcohol":3.0,"region":"Americas","dominant":"spirits"},{"country":"Hungary","beer_servings":234,"spirit_servings":215,"wine_servings":185,"total_litres_of_pure_alcohol":11.3,"region":"Europe","dominant":"beer"},{"country":"Iceland","beer_servings":233,"spirit_servings":61,"wine_servings":78,"total_litres_of_pure_alcohol":6.6,"region":"Europe","dominant":"beer"},{"country":"India","beer_servings":9,"spirit_servings":114,"wine_servings":0,"total_litres_of_pure_alcohol":2.2,"region":"Asia","dominant":"spirits"},{"country":"Indonesia","beer_servings":5,"spirit_servings":1,"wine_servings":0,"total_litres_of_pure_alcohol":0.1,"region":"Asia","dominant":"beer"},{"country":"Iran","beer_servings":0,"spirit_servings":0,"wine_servings":0,"total_litres_of_pure_alcohol":0.0,"region":"Asia","dominant":"none"},{"country":"Iraq","beer_servings":9,"spirit_servings":3,"wine_servings":0,"total_litres_of_pure_alcohol":0.2,"region":"Asia","dominant":"beer"},{"country":"Ireland","beer_servings":313,"spirit_servings":118,"wine_servings":165,"total_litres_of_pure_alcohol":11.4,"region":"Europe","dominant":"beer"},{"country":"Israel","beer_servings":63,"spirit_servings":69,"wine_servings":9,"total_litres_of_pure_alcohol":2.5,"region":"Asia","dominant":"spirits"},{"country":"Italy","beer_servings":85,"spirit_servings":42,"wine_servings":237,"total_litres_of_pure_alcohol":6.5,"region":"Europe","dominant":"wine"},{"country":"Jamaica","beer_servings":82,"spirit_servings":97,"wine_servings":9,"total_litres_of_pure_alcohol":3.4,"region":"Americas","dominant":"spirits"},{"country":"Japan","beer_servings":77,"spirit_servings":202,"wine_servings":16,"total_litres_of_pure_alcohol":7.0,"region":"Asia","dominant":"spirits"},{"country":"Jordan","beer_servings":6,"spirit_servings":21,"wine_servings":1,"total_litres_of_pure_alcohol":0.5,"region":"Asia","dominant":"spirits"},{"country":"Kazakhstan","beer_servings":124,"spirit_servings":246,"wine_servings":12,"total_litres_of_pure_alcohol":6.8,"region":"Asia","dominant":"spirits"},{"country":"Kenya","beer_servings":58,"spirit_servings":22,"wine_servings":2,"total_litres_of_pure_alcohol":1.8,"region":"Africa","dominant":"beer"},{"country":"Kiribati","beer_servings":21,"spirit_servings":34,"wine_servings":1,"total_litres_of_pure_alcohol":1.0,"region":"Oceania","dominant":"spirits"},{"country":"Kuwait","beer_servings":0,"spirit_servings":0,"wine_servings":0,"total_litres_of_pure_alcohol":0.0,"region":"Asia","dominant":"none"},{"country":"Kyrgyzstan","beer_servings":31,"spirit_servings":97,"wine_servings":6,"total_litres_of_pure_alcohol":2.4,"region":"Asia","dominant":"spirits"},{"country":"Laos","beer_servings":62,"spirit_servings":0,"wine_servings":123,"total_litres_of_pure_alcohol":6.2,"region":"Asia","dominant":"wine"},{"country":"Latvia","beer_servings":281,"spirit_servings":216,"wine_servings":62,"total_litres_of_pure_alcohol":10.5,"region":"Europe","dominant":"beer"},{"country":"Lebanon","beer_servings":20,"spirit_servings":55,"wine_servings":31,"total_litres_of_pure_alcohol":1.9,"region":"Asia","dominant":"spirits"},{"country":"Lesotho","beer_servings":82,"spirit_servings":29,"wine_servings":0,"total_litres_of_pure_alcohol":2.8,"region":"Africa","dominant":"beer"},{"country":"Liberia","beer_servings":19,"spirit_servings":152,"wine_servings":2,"total_litres_of_pure_alcohol":3.1,"region":"Africa","dominant":"spirits"},{"country":"Libya","beer_servings":0,"spirit_servings":0,"wine_servings":0,"total_litres_of_pure_alcohol":0.0,"region":"Africa","dominant":"none"},{"country":"Lithuania","beer_servings":343,"spirit_servings":244,"wine_servings":56,"total_litres_of_pure_alcohol":12.9,"region":"Europe","dominant":"beer"},{"country":"Luxembourg","beer_servings":236,"spirit_servings":133,"wine_servings":271,"total_litres_of_pure_alcohol":11.4,"region":"Europe","dominant":"wine"},{"country":"Madagascar","beer_servings":26,"spirit_servings":15,"wine_servings":4,"total_litres_of_pure_alcohol":0.8,"region":"Africa","dominant":"beer"},{"country":"Malawi","beer_servings":8,"spirit_servings":11,"wine_servings":1,"total_litres_of_pure_alcohol":1.5,"region":"Africa","dominant":"spirits"},{"country":"Malaysia","beer_servings":13,"spirit_servings":4,"wine_servings":0,"total_litres_of_pure_alcohol":0.3,"region":"Asia","dominant":"beer"},{"country":"Maldives","beer_servings":0,"spirit_servings":0,"wine_servings":0,"total_litres_of_pure_alcohol":0.0,"region":"Asia","dominant":"none"},{"country":"Mali","beer_servings":5,"spirit_servings":1,"wine_servings":1,"total_litres_of_pure_alcohol":0.6,"region":"Africa","dominant":"beer"},{"country":"Malta","beer_servings":149,"spirit_servings":100,"wine_servings":120,"total_litres_of_pure_alcohol":6.6,"region":"Europe","dominant":"beer"},{"country":"Marshall Islands","beer_servings":0,"spirit_servings":0,"wine_servings":0,"total_litres_of_pure_alcohol":0.0,"region":"Oceania","dominant":"none"},{"country":"Mauritania","beer_servings":0,"spirit_servings":0,"wine_servings":0,"total_litres_of_pure_alcohol":0.0,"region":"Africa","dominant":"none"},{"country":"Mauritius","beer_servings":98,"spirit_servings":31,"wine_servings":18,"total_litres_of_pure_alcohol":2.6,"region":"Africa","dominant":"beer"},{"country":"Mexico","beer_servings":238,"spirit_servings":68,"wine_servings":5,"total_litres_of_pure_alcohol":5.5,"region":"Americas","dominant":"beer"},{"country":"Micronesia","beer_servings":62,"spirit_servings":50,"wine_servings":18,"total_litres_of_pure_alcohol":2.3,"region":"Oceania","dominant":"beer"},{"country":"Monaco","beer_servings":0,"spirit_servings":0,"wine_servings":0,"total_litres_of_pure_alcohol":0.0,"region":"Europe","dominant":"none"},{"country":"Mongolia","beer_servings":77,"spirit_servings":189,"wine_servings":8,"total_litres_of_pure_alcohol":4.9,"region":"Asia","dominant":"spirits"},{"country":"Montenegro","beer_servings":31,"spirit_servings":114,"wine_servings":128,"total_litres_of_pure_alcohol":4.9,"region":"Europe","dominant":"wine"},{"country":"Morocco","beer_servings":12,"spirit_servings":6,"wine_servings":10,"total_litres_of_pure_alcohol":0.5,"region":"Africa","dominant":"beer"},{"country":"Mozambique","beer_servings":47,"spirit_servings":18,"wine_servings":5,"total_litres_of_pure_alcohol":1.3,"region":"Africa","dominant":"beer"},{"country":"Myanmar","beer_servings":5,"spirit_servings":1,"wine_servings":0,"total_litres_of_pure_alcohol":0.1,"region":"Asia","dominant":"beer"},{"country":"Namibia","beer_servings":376,"spirit_servings":3,"wine_servings":1,"total_litres_of_pure_alcohol":6.8,"region":"Africa","dominant":"beer"},{"country":"Nauru","beer_servings":49,"spirit_servings":0,"wine_servings":8,"total_litres_of_pure_alcohol":1.0,"region":"Oceania","dominant":"beer"},{"country":"Nepal","beer_servings":5,"spirit_servings":6,"wine_servings":0,"total_litres_of_pure_alcohol":0.2,"region":"Asia","dominant":"spirits"},{"country":"Netherlands","beer_servings":251,"spirit_servings":88,"wine_servings":190,"total_litres_of_pure_alcohol":9.4,"region":"Europe","dominant":"beer"},{"country":"New Zealand","beer_servings":203,"spirit_servings":79,"wine_servings":175,"total_litres_of_pure_alcohol":9.3,"region":"Oceania","dominant":"beer"},{"country":"Nicaragua","beer_servings":78,"spirit_servings":118,"wine_servings":1,"total_litres_of_pure_alcohol":3.5,"region":"Americas","dominant":"spirits"},{"country":"Niger","beer_servings":3,"spirit_servings":2,"wine_servings":1,"total_litres_of_pure_alcohol":0.1,"region":"Africa","dominant":"beer"},{"country":"Nigeria","beer_servings":42,"spirit_servings":5,"wine_servings":2,"total_litres_of_pure_alcohol":9.1,"region":"Africa","dominant":"beer"},{"country":"Niue","beer_servings":188,"spirit_servings":200,"wine_servings":7,"total_litres_of_pure_alcohol":7.0,"region":"Oceania","dominant":"spirits"},{"country":"Norway","beer_servings":169,"spirit_servings":71,"wine_servings":129,"total_litres_of_pure_alcohol":6.7,"region":"Europe","dominant":"beer"},{"country":"Oman","beer_servings":22,"spirit_servings":16,"wine_servings":1,"total_litres_of_pure_alcohol":0.7,"region":"Asia","dominant":"beer"},{"country":"Pakistan","beer_servings":0,"spirit_servings":0,"wine_servings":0,"total_litres_of_pure_alcohol":0.0,"region":"Asia","dominant":"none"},{"country":"Palau","beer_servings":306,"spirit_servings":63,"wine_servings":23,"total_litres_of_pure_alcohol":6.9,"region":"Oceania","dominant":"beer"},{"country":"Panama","beer_servings":285,"spirit_servings":104,"wine_servings":18,"total_litres_of_pure_alcohol":7.2,"region":"Americas","dominant":"beer"},{"country":"Papua New Guinea","beer_servings":44,"spirit_servings":39,"wine_servings":1,"total_litres_of_pure_alcohol":1.5,"region":"Oceania","dominant":"beer"},{"country":"Paraguay","beer_servings":213,"spirit_servings":117,"wine_servings":74,"total_litres_of_pure_alcohol":7.3,"region":"Americas","dominant":"beer"},{"country":"Peru","beer_servings":163,"spirit_servings":160,"wine_servings":21,"total_litres_of_pure_alcohol":6.1,"region":"Americas","dominant":"beer"},{"country":"Philippines","beer_servings":71,"spirit_servings":186,"wine_servings":1,"total_litres_of_pure_alcohol":4.6,"region":"Asia","dominant":"spirits"},{"country":"Poland","beer_servings":343,"spirit_servings":215,"wine_servings":56,"total_litres_of_pure_alcohol":10.9,"region":"Europe","dominant":"beer"},{"country":"Portugal","beer_servings":194,"spirit_servings":67,"wine_servings":339,"total_litres_of_pure_alcohol":11.0,"region":"Europe","dominant":"wine"},{"country":"Qatar","beer_servings":1,"spirit_servings":42,"wine_servings":7,"total_litres_of_pure_alcohol":0.9,"region":"Asia","dominant":"spirits"},{"country":"South Korea","beer_servings":140,"spirit_servings":16,"wine_servings":9,"total_litres_of_pure_alcohol":9.8,"region":"Asia","dominant":"beer"},{"country":"Moldova","beer_servings":109,"spirit_servings":226,"wine_servings":18,"total_litres_of_pure_alcohol":6.3,"region":"Europe","dominant":"spirits"},{"country":"Romania","beer_servings":297,"spirit_servings":122,"wine_servings":167,"total_litres_of_pure_alcohol":10.4,"region":"Europe","dominant":"beer"},{"country":"Russian Federation","beer_servings":247,"spirit_servings":326,"wine_servings":73,"total_litres_of_pure_alcohol":11.5,"region":"Europe","dominant":"spirits"},{"country":"Rwanda","beer_servings":43,"spirit_servings":2,"wine_servings":0,"total_litres_of_pure_alcohol":6.8,"region":"Africa","dominant":"beer"},{"country":"St. Kitts & Nevis","beer_servings":194,"spirit_servings":205,"wine_servings":32,"total_litres_of_pure_alcohol":7.7,"region":"Americas","dominant":"spirits"},{"country":"St. Lucia","beer_servings":171,"spirit_servings":315,"wine_servings":71,"total_litres_of_pure_alcohol":10.1,"region":"Americas","dominant":"spirits"},{"country":"St. Vincent & the Grenadines","beer_servings":120,"spirit_servings":221,"wine_servings":11,"total_litres_of_pure_alcohol":6.3,"region":"Americas","dominant":"spirits"},{"country":"Samoa","beer_servings":105,"spirit_servings":18,"wine_servings":24,"total_litres_of_pure_alcohol":2.6,"region":"Oceania","dominant":"beer"},{"country":"San Marino","beer_servings":0,"spirit_servings":0,"wine_servings":0,"total_litres_of_pure_alcohol":0.0,"region":"Europe","dominant":"none"},{"country":"Sao Tome & Principe","beer_servings":56,"spirit_servings":38,"wine_servings":140,"total_litres_of_pure_alcohol":4.2,"region":"Africa","dominant":"wine"},{"country":"Saudi Arabia","beer_servings":0,"spirit_servings":5,"wine_servings":0,"total_litres_of_pure_alcohol":0.1,"region":"Asia","dominant":"spirits"},{"country":"Senegal","beer_servings":9,"spirit_servings":1,"wine_servings":7,"total_litres_of_pure_alcohol":0.3,"region":"Africa","dominant":"beer"},{"country":"Serbia","beer_servings":283,"spirit_servings":131,"wine_servings":127,"total_litres_of_pure_alcohol":9.6,"region":"Europe","dominant":"beer"},{"country":"Seychelles","beer_servings":157,"spirit_servings":25,"wine_servings":51,"total_litres_of_pure_alcohol":4.1,"region":"Africa","dominant":"beer"},{"country":"Sierra Leone","beer_servings":25,"spirit_servings":3,"wine_servings":2,"total_litres_of_pure_alcohol":6.7,"region":"Africa","dominant":"beer"},{"country":"Singapore","beer_servings":60,"spirit_servings":12,"wine_servings":11,"total_litres_of_pure_alcohol":1.5,"region":"Asia","dominant":"beer"},{"country":"Slovakia","beer_servings":196,"spirit_servings":293,"wine_servings":116,"total_litres_of_pure_alcohol":11.4,"region":"Europe","dominant":"spirits"},{"country":"Slovenia","beer_servings":270,"spirit_servings":51,"wine_servings":276,"total_litres_of_pure_alcohol":10.6,"region":"Europe","dominant":"wine"},{"country":"Solomon Islands","beer_servings":56,"spirit_servings":11,"wine_servings":1,"total_litres_of_pure_alcohol":1.2,"region":"Oceania","dominant":"beer"},{"country":"Somalia","beer_servings":0,"spirit_servings":0,"wine_servings":0,"total_litres_of_pure_alcohol":0.0,"region":"Africa","dominant":"none"},{"country":"South Africa","beer_servings":225,"spirit_servings":76,"wine_servings":81,"total_litres_of_pure_alcohol":8.2,"region":"Africa","dominant":"beer"},{"country":"Spain","beer_servings":284,"spirit_servings":157,"wine_servings":112,"total_litres_of_pure_alcohol":10.0,"region":"Europe","dominant":"beer"},{"country":"Sri Lanka","beer_servings":16,"spirit_servings":104,"wine_servings":0,"total_litres_of_pure_alcohol":2.2,"region":"Asia","dominant":"spirits"},{"country":"Sudan","beer_servings":8,"spirit_servings":13,"wine_servings":0,"total_litres_of_pure_alcohol":1.7,"region":"Africa","dominant":"spirits"},{"country":"Suriname","beer_servings":128,"spirit_servings":178,"wine_servings":7,"total_litres_of_pure_alcohol":5.6,"region":"Americas","dominant":"spirits"},{"country":"Swaziland","beer_servings":90,"spirit_servings":2,"wine_servings":2,"total_litres_of_pure_alcohol":4.7,"region":"Africa","dominant":"beer"},{"country":"Sweden","beer_servings":152,"spirit_servings":60,"wine_servings":186,"total_litres_of_pure_alcohol":7.2,"region":"Europe","dominant":"wine"},{"country":"Switzerland","beer_servings":185,"spirit_servings":100,"wine_servings":280,"total_litres_of_pure_alcohol":10.2,"region":"Europe","dominant":"wine"},{"country":"Syria","beer_servings":5,"spirit_servings":35,"wine_servings":16,"total_litres_of_pure_alcohol":1.0,"region":"Asia","dominant":"spirits"},{"country":"Tajikistan","beer_servings":2,"spirit_servings":15,"wine_servings":0,"total_litres_of_pure_alcohol":0.3,"region":"Asia","dominant":"spirits"},{"country":"Thailand","beer_servings":99,"spirit_servings":258,"wine_servings":1,"total_litres_of_pure_alcohol":6.4,"region":"Asia","dominant":"spirits"},{"country":"Macedonia","beer_servings":106,"spirit_servings":27,"wine_servings":86,"total_litres_of_pure_alcohol":3.9,"region":"Europe","dominant":"beer"},{"country":"Timor-Leste","beer_servings":1,"spirit_servings":1,"wine_servings":4,"total_litres_of_pure_alcohol":0.1,"region":"Asia","dominant":"wine"},{"country":"Togo","beer_servings":36,"spirit_servings":2,"wine_servings":19,"total_litres_of_pure_alcohol":1.3,"region":"Africa","dominant":"beer"},{"country":"Tonga","beer_servings":36,"spirit_servings":21,"wine_servings":5,"total_litres_of_pure_alcohol":1.1,"region":"Oceania","dominant":"beer"},{"country":"Trinidad & Tobago","beer_servings":197,"spirit_servings":156,"wine_servings":7,"total_litres_of_pure_alcohol":6.4,"region":"Americas","dominant":"beer"},{"country":"Tunisia","beer_servings":51,"spirit_servings":3,"wine_servings":20,"total_litres_of_pure_alcohol":1.3,"region":"Africa","dominant":"beer"},{"country":"Turkey","beer_servings":51,"spirit_servings":22,"wine_servings":7,"total_litres_of_pure_alcohol":1.4,"region":"Asia","dominant":"beer"},{"country":"Turkmenistan","beer_servings":19,"spirit_servings":71,"wine_servings":32,"total_litres_of_pure_alcohol":2.2,"region":"Asia","dominant":"spirits"},{"country":"Tuvalu","beer_servings":6,"spirit_servings":41,"wine_servings":9,"total_litres_of_pure_alcohol":1.0,"region":"Oceania","dominant":"spirits"},{"country":"Uganda","beer_servings":45,"spirit_servings":9,"wine_servings":0,"total_litres_of_pure_alcohol":8.3,"region":"Africa","dominant":"beer"},{"country":"Ukraine","beer_servings":206,"spirit_servings":237,"wine_servings":45,"total_litres_of_pure_alcohol":8.9,"region":"Europe","dominant":"spirits"},{"country":"United Arab Emirates","beer_servings":16,"spirit_servings":135,"wine_servings":5,"total_litres_of_pure_alcohol":2.8,"region":"Asia","dominant":"spirits"},{"country":"United Kingdom","beer_servings":219,"spirit_servings":126,"wine_servings":195,"total_litres_of_pure_alcohol":10.4,"region":"Europe","dominant":"beer"},{"country":"Tanzania","beer_servings":36,"spirit_servings":6,"wine_servings":1,"total_litres_of_pure_alcohol":5.7,"region":"Africa","dominant":"beer"},{"country":"USA","beer_servings":249,"spirit_servings":158,"wine_servings":84,"total_litres_of_pure_alcohol":8.7,"region":"Americas","dominant":"beer"},{"country":"Uruguay","beer_servings":115,"spirit_servings":35,"wine_servings":220,"total_litres_of_pure_alcohol":6.6,"region":"Americas","dominant":"wine"},{"country":"Uzbekistan","beer_servings":25,"spirit_servings":101,"wine_servings":8,"total_litres_of_pure_alcohol":2.4,"region":"Asia","dominant":"spirits"},{"country":"Vanuatu","beer_servings":21,"spirit_servings":18,"wine_servings":11,"total_litres_of_pure_alcohol":0.9,"region":"Oceania","dominant":"beer"},{"country":"Venezuela","beer_servings":333,"spirit_servings":100,"wine_servings":3,"total_litres_of_pure_alcohol":7.7,"region":"Americas","dominant":"beer"},{"country":"Vietnam","beer_servings":111,"spirit_servings":2,"wine_servings":1,"total_litres_of_pure_alcohol":2.0,"region":"Asia","dominant":"beer"},{"country":"Yemen","beer_servings":6,"spirit_servings":0,"wine_servings":0,"total_litres_of_pure_alcohol":0.1,"region":"Africa","dominant":"beer"},{"country":"Zambia","beer_servings":32,"spirit_servings":19,"wine_servings":4,"total_litres_of_pure_alcohol":2.5,"region":"Africa","dominant":"beer"},{"country":"Zimbabwe","beer_servings":64,"spirit_servings":18,"wine_servings":4,"total_litres_of_pure_alcohol":4.7,"region":"Africa","dominant":"beer"}];
+
+// ─ HELPERS ─
+const tt=document.getElementById('tooltip');
+function showTT(d,e){
+  document.getElementById('tt-name').textContent=d.country;
+  document.getElementById('tt-region').textContent=d.region;
+  document.getElementById('tt-beer').textContent=d.beer_servings+' servings';
+  document.getElementById('tt-spirits').textContent=d.spirit_servings+' servings';
+  document.getElementById('tt-wine').textContent=d.wine_servings+' servings';
+  document.getElementById('tt-total').textContent=d.total_litres_of_pure_alcohol.toFixed(1)+' L';
+  document.getElementById('tt-dom').textContent=d.dominant;
+  tt.style.display='block';
+  posTT(e);
+}
+function posTT(e){
+  const x=e.clientX+16,y=e.clientY-10;
+  tt.style.left=(x+200>window.innerWidth?x-220:x)+'px';
+  tt.style.top=y+'px';
+}
+document.addEventListener('mousemove',e=>{if(tt.style.display==='block')posTT(e)});
+function hideTT(){tt.style.display='none'}
+function avg(arr,k){return arr.reduce((s,d)=>s+d[k],0)/arr.length}
+function topN(k,n){return[...RAW].sort((a,b)=>b[k]-a[k]).slice(0,n)}
+const domColor={beer:'var(--beer)',spirits:'var(--spirits)',wine:'var(--wine)',none:'var(--dim)'};
+
+// ─ SCROLL PROGRESS ─
+window.addEventListener('scroll',()=>{
+  const s=document.documentElement.scrollHeight-window.innerHeight;
+  document.getElementById('progress').style.width=(window.scrollY/s*100)+'%';
+});
+
+// ─ REVEAL ON SCROLL ─
+const observer=new IntersectionObserver(entries=>{
+  entries.forEach(e=>{if(e.isIntersecting){e.target.classList.add('visible');observer.unobserve(e.target)}});
+},{threshold:0.12});
+document.querySelectorAll('.reveal').forEach(el=>observer.observe(el));
+
+// ─ BAR CHART BUILDER ─
+function makeBarChart(containerId,data,keyFn,colorFn,maxVal){
+  const wrap=document.getElementById(containerId);
+  wrap.innerHTML='';
+  const maxV=maxVal||Math.max(...data.map(keyFn));
+  data.forEach(d=>{
+    const val=keyFn(d);
+    const pct=(val/maxV*100).toFixed(1);
+    const row=document.createElement('div');
+    row.className='bar-row';
+    row.innerHTML=`<div class="bar-name" title="${d.country}">${d.country}</div><div class="bar-track"><div class="bar-fill" style="background:${colorFn(d)};width:0%" data-w="${pct}"></div></div><div class="bar-val">${val}</div>`;
+    row.addEventListener('mouseenter',e=>showTT(d,e));
+    row.addEventListener('mouseleave',hideTT);
+    wrap.appendChild(row);
+  });
+  setTimeout(()=>wrap.querySelectorAll('.bar-fill').forEach(b=>{b.style.width=b.dataset.w+'%'}),100);
+}
+
+// ─ SECTION 1: CHARTS ─
+const top15Total=topN('total_litres_of_pure_alcohol',15);
+makeBarChart('bar-total',top15Total,d=>d.total_litres_of_pure_alcohol,d=>domColor[d.dominant],14.4);
+
+// Stacked
+const top12=topN('total_litres_of_pure_alcohol',12);
+const stackMax=Math.max(...top12.map(d=>d.beer_servings+d.spirit_servings+d.wine_servings));
+const sc=document.getElementById('stacked-chart');
+top12.forEach(d=>{
+  const tot=d.beer_servings+d.spirit_servings+d.wine_servings;
+  const row=document.createElement('div');
+  row.className='stacked-row';
+  const bPct=(d.beer_servings/stackMax*100).toFixed(1);
+  const sPct=(d.spirit_servings/stackMax*100).toFixed(1);
+  const wPct=(d.wine_servings/stackMax*100).toFixed(1);
+  row.innerHTML=`<div class="stacked-name" title="${d.country}">${d.country}</div>
+    <div class="stacked-track">
+      <div class="stacked-seg" style="background:var(--beer)" data-w="${bPct}"></div>
+      <div class="stacked-seg" style="background:var(--spirits)" data-w="${sPct}"></div>
+      <div class="stacked-seg" style="background:var(--wine)" data-w="${wPct}"></div>
+    </div>
+    <div class="stacked-total">${tot}</div>`;
+  row.addEventListener('mouseenter',e=>showTT(d,e));
+  row.addEventListener('mouseleave',hideTT);
+  sc.appendChild(row);
+});
+setTimeout(()=>sc.querySelectorAll('.stacked-seg').forEach(s=>{s.style.width=s.dataset.w+'%'}),150);
+
+// ─ SECTION 2: REGIONS ─
+const REGIONS={
+  Europe:{color:'#d4931e',count:46,avgTotal:8.7,avgBeer:194.9,avgSpirits:136.8,avgWine:140.7},
+  Americas:{color:'#c0392b',count:36,avgTotal:6.1,avgBeer:151.3,avgSpirits:151.2,avgWine:38.5},
+  Asia:{color:'#8e44ad',count:43,avgTotal:2.0,avgBeer:32.2,avgSpirits:54.7,avgWine:7.6},
+  Africa:{color:'#27ae60',count:52,avgTotal:3.1,avgBeer:62.6,avgSpirits:16.6,avgWine:16.6},
+  Oceania:{color:'#2980b9',count:15,avgTotal:3.2,avgBeer:95.7,avgSpirits:45.4,avgWine:33.1}
+};
+const maxRegTotal=Math.max(...Object.values(REGIONS).map(r=>r.avgTotal));
+const maxRegBeer=Math.max(...Object.values(REGIONS).map(r=>r.avgBeer));
+const maxRegSp=Math.max(...Object.values(REGIONS).map(r=>r.avgSpirits));
+const maxRegWine=Math.max(...Object.values(REGIONS).map(r=>r.avgWine));
+
+const rcWrap=document.getElementById('region-cards');
+Object.entries(REGIONS).forEach(([name,r],i)=>{
+  const card=document.createElement('div');
+  card.className='region-card reveal';
+  card.style.setProperty('--rc-color',r.color);
+  if(i>0)card.classList.add(`reveal-delay-${Math.min(i,4)}`);
+  card.innerHTML=`
+    <div class="region-name">${name}</div>
+    <div class="region-count">${r.count} countries</div>
+    <div class="region-avg">${r.avgTotal}<span class="region-unit">L/yr avg</span></div>
+    <div class="region-bars">
+      <div class="region-bar-row">
+        <span>Beer</span>
+        <div class="region-bar-track"><div class="region-bar-fill" style="background:var(--beer)" data-w="${(r.avgBeer/maxRegBeer*100).toFixed(0)}"></div></div>
+        <span class="region-bar-val">${Math.round(r.avgBeer)}</span>
+      </div>
+      <div class="region-bar-row">
+        <span>Spirits</span>
+        <div class="region-bar-track"><div class="region-bar-fill" style="background:var(--spirits)" data-w="${(r.avgSpirits/maxRegSp*100).toFixed(0)}"></div></div>
+        <span class="region-bar-val">${Math.round(r.avgSpirits)}</span>
+      </div>
+      <div class="region-bar-row">
+        <span>Wine</span>
+        <div class="region-bar-track"><div class="region-bar-fill" style="background:var(--wine)" data-w="${(r.avgWine/maxRegWine*100).toFixed(0)}"></div></div>
+        <span class="region-bar-val">${Math.round(r.avgWine)}</span>
+      </div>
+    </div>`;
+  rcWrap.appendChild(card);
+  observer.observe(card);
+  setTimeout(()=>card.querySelectorAll('.region-bar-fill').forEach(b=>{b.style.width=b.dataset.w+'%'}),400+i*100);
+});
+
+// Region grouped bar
+const rbChart=document.getElementById('region-bar-chart');
+const regionList=['Europe','Americas','Africa','Oceania','Asia'];
+const rMaxBeer=Math.max(...regionList.map(r=>REGIONS[r].avgBeer));
+regionList.forEach(name=>{
+  const r=REGIONS[name];
+  const row=document.createElement('div');
+  row.style.cssText='margin-bottom:16px';
+  row.innerHTML=`
+    <div style="font-family:JetBrains Mono,monospace;font-size:10px;color:var(--muted);margin-bottom:6px;letter-spacing:0.1em">${name.toUpperCase()}</div>
+    <div class="bar-row" style="grid-template-columns:60px 1fr 42px;margin-bottom:4px">
+      <div style="font-size:10px;color:var(--dim);text-align:right">Beer</div>
+      <div class="bar-track"><div class="bar-fill" style="background:var(--beer)" data-w="${(r.avgBeer/rMaxBeer*100).toFixed(0)}"></div></div>
+      <div class="bar-val">${Math.round(r.avgBeer)}</div>
+    </div>
+    <div class="bar-row" style="grid-template-columns:60px 1fr 42px;margin-bottom:4px">
+      <div style="font-size:10px;color:var(--dim);text-align:right">Spirits</div>
+      <div class="bar-track"><div class="bar-fill" style="background:var(--spirits)" data-w="${(r.avgSpirits/rMaxBeer*100).toFixed(0)}"></div></div>
+      <div class="bar-val">${Math.round(r.avgSpirits)}</div>
+    </div>
+    <div class="bar-row" style="grid-template-columns:60px 1fr 42px">
+      <div style="font-size:10px;color:var(--dim);text-align:right">Wine</div>
+      <div class="bar-track"><div class="bar-fill" style="background:var(--wine)" data-w="${(r.avgWine/rMaxBeer*100).toFixed(0)}"></div></div>
+      <div class="bar-val">${Math.round(r.avgWine)}</div>
+    </div>`;
+  rbChart.appendChild(row);
+});
+setTimeout(()=>rbChart.querySelectorAll('.bar-fill').forEach(b=>{b.style.width=b.dataset.w+'%'}),200);
+
+// ─ SECTION 3: SPOTLIGHTS ─
+const spotlights=[
+  {country:'Belarus',flag:'🇧🇾',tag:'Heaviest drinker',tagColor:'var(--spirits-dim)',tagText:'var(--spirits)',story:'The world\'s biggest drinker. 373 spirit servings per year, driven by vodka culture and high homemade brew consumption. Total: 14.4L — nearly triple the global average.'},
+  {country:'Namibia',flag:'🇳🇦',tag:'Beer mono-culture',tagColor:'var(--beer-dim)',tagText:'var(--beer)',story:'376 beer servings but only 3 spirits and 1 wine. Lager beer dominates almost exclusively, a legacy of German colonial brewing traditions that persist over a century later.'},
+  {country:'Grenada',flag:'🇬🇩',tag:'Spirit champion',tagColor:'var(--spirits-dim)',tagText:'var(--spirits)',story:'The highest spirit consumption on Earth: 438 servings/year. Rum production on this Caribbean island drives extraordinary local consumption rates.'},
+  {country:'France',flag:'🇫🇷',tag:'The wine archetype',tagColor:'var(--wine-dim)',tagText:'var(--wine)',story:'370 wine servings — the world\'s highest — defines France\'s identity. Yet spirits (151) and beer (127) are hardly negligible. The most balanced high-volume drinker.'},
+  {country:'Haiti',flag:'🇭🇹',tag:'Spirits only',tagColor:'var(--spirits-dim)',tagText:'var(--spirits)',story:'326 spirit servings, but only 1 beer and 1 wine. Clairin, a raw sugarcane spirit, dominates Haitian consumption. The most extreme beverage mono-culture in the dataset.'},
+  {country:'Czech Republic',flag:'🇨🇿',tag:'Beer royalty',tagColor:'var(--beer-dim)',tagText:'var(--beer)',story:'361 beer servings — the highest national beer consumption on Earth. Czech Pilsner was literally invented here. The country averages nearly one beer per person per day.'},
+  {country:'Nigeria',flag:'🇳🇬',tag:'Africa\'s puzzle',tagColor:'var(--beer-dim)',tagText:'var(--beer)',story:'9.1L total — one of Africa\'s heaviest consumers — yet only 42 beer servings. The gap is filled by locally-brewed sorghum beer and palm wine, which may not appear in serving counts.'},
+  {country:'South Korea',flag:'🇰🇷',tag:'Asian outlier',tagColor:'var(--beer-dim)',tagText:'var(--beer)',story:'9.8L total, the highest in Asia excluding Russia. Soju — a rice spirit — typically fills Asian spirit tables, but South Korea\'s remarkable 140 beer servings make it a regional outlier.'},
+  {country:'Equatorial Guinea',flag:'🇬🇶',tag:'Wine surprise',tagColor:'var(--wine-dim)',tagText:'var(--wine)',story:'233 wine servings in Central Africa — shocking given the context. A legacy of Portuguese and Spanish colonial influence. One of only 20 countries globally where wine is the dominant drink.'}
+];
+const sgWrap=document.getElementById('spotlight-grid');
+spotlights.forEach(s=>{
+  const d=RAW.find(r=>r.country===s.country);
+  const cell=document.createElement('div');
+  cell.className='spotlight-cell';
+  cell.innerHTML=`
+    <div class="sp-flag">${s.flag}</div>
+    <div class="sp-country">${s.country}</div>
+    <div><span class="sp-tag" style="background:${s.tagColor};color:${s.tagText}">${s.tag}</span></div>
+    <div class="sp-story">${s.story}</div>
+    <div class="sp-nums">
+      <div class="sp-num-item"><div class="sp-num-label">Beer</div><div class="sp-num-val" style="color:var(--beer)">${d.beer_servings}</div></div>
+      <div class="sp-num-item"><div class="sp-num-label">Spirits</div><div class="sp-num-val" style="color:var(--spirits)">${d.spirit_servings}</div></div>
+      <div class="sp-num-item"><div class="sp-num-label">Wine</div><div class="sp-num-val" style="color:var(--wine)">${d.wine_servings}</div></div>
+      <div class="sp-num-item"><div class="sp-num-label">Total L</div><div class="sp-num-val" style="color:var(--gold)">${d.total_litres_of_pure_alcohol}</div></div>
+    </div>`;
+  cell.addEventListener('mouseenter',e=>showTT(d,e));
+  cell.addEventListener('mouseleave',hideTT);
+  sgWrap.appendChild(cell);
+});
+
+// ─ SCATTER PLOT ─
+(function(){
+  const svg=d3.select('#scatter-svg');
+  const W=800,H=440,pad={top:30,right:30,bottom:50,left:60};
+  const iW=W-pad.left-pad.right,iH=H-pad.top-pad.bottom;
+  const g=svg.append('g').attr('transform',`translate(${pad.left},${pad.top})`);
+  const xS=d3.scaleLinear().domain([0,400]).range([0,iW]);
+  const yS=d3.scaleLinear().domain([0,450]).range([iH,0]);
+  const rS=d3.scaleSqrt().domain([0,14.4]).range([2,18]);
+  // axes
+  g.append('g').attr('transform',`translate(0,${iH})`).call(d3.axisBottom(xS).ticks(8).tickSize(-iH))
+    .call(ax=>{ax.select('.domain').remove();ax.selectAll('.tick line').attr('stroke','rgba(255,255,255,0.04)');ax.selectAll('.tick text').attr('fill','#4a4238').attr('font-family','JetBrains Mono').attr('font-size','10')});
+  g.append('g').call(d3.axisLeft(yS).ticks(8).tickSize(-iW))
+    .call(ax=>{ax.select('.domain').remove();ax.selectAll('.tick line').attr('stroke','rgba(255,255,255,0.04)');ax.selectAll('.tick text').attr('fill','#4a4238').attr('font-family','JetBrains Mono').attr('font-size','10')});
+  // axis labels
+  g.append('text').attr('x',iW/2).attr('y',iH+40).attr('text-anchor','middle').attr('fill','#4a4238').attr('font-family','JetBrains Mono').attr('font-size','10').text('Beer servings / year');
+  g.append('text').attr('transform','rotate(-90)').attr('x',-iH/2).attr('y',-46).attr('text-anchor','middle').attr('fill','#4a4238').attr('font-family','JetBrains Mono').attr('font-size','10').text('Spirit servings / year');
+  // avg lines
+  const avgBeer=avg(RAW,'beer_servings'),avgSpirit=avg(RAW,'spirit_servings');
+  g.append('line').attr('x1',xS(avgBeer)).attr('x2',xS(avgBeer)).attr('y1',0).attr('y2',iH).attr('stroke','rgba(212,184,150,0.15)').attr('stroke-dasharray','4,4');
+  g.append('line').attr('x1',0).attr('x2',iW).attr('y1',yS(avgSpirit)).attr('y2',yS(avgSpirit)).attr('stroke','rgba(212,184,150,0.15)').attr('stroke-dasharray','4,4');
+  g.append('text').attr('x',xS(avgBeer)+4).attr('y',12).attr('fill','rgba(212,184,150,0.4)').attr('font-family','JetBrains Mono').attr('font-size','9').text('avg beer');
+  g.append('text').attr('x',4).attr('y',yS(avgSpirit)-4).attr('fill','rgba(212,184,150,0.4)').attr('font-family','JetBrains Mono').attr('font-size','9').text('avg spirits');
+  // dots
+  const circles=g.selectAll('circle').data(RAW).join('circle')
+    .attr('cx',d=>xS(d.beer_servings)).attr('cy',d=>yS(d.spirit_servings))
+    .attr('r',d=>rS(d.total_litres_of_pure_alcohol))
+    .attr('fill',d=>{const c={beer:'rgba(212,147,30,0.55)',spirits:'rgba(192,57,43,0.55)',wine:'rgba(142,68,173,0.55)',none:'rgba(74,66,56,0.4)'};return c[d.dominant]||'rgba(212,184,150,0.3)'})
+    .attr('stroke',d=>{const c={beer:'rgba(212,147,30,0.8)',spirits:'rgba(192,57,43,0.8)',wine:'rgba(142,68,173,0.8)',none:'rgba(74,66,56,0.6)'};return c[d.dominant]||'rgba(212,184,150,0.5)'})
+    .attr('stroke-width',0.8).style('cursor','pointer');
+  // labels for big ones
+  const labeled=['Belarus','Czech Republic','Grenada','Namibia','France','Germany','Ireland','Lithuania'];
+  g.selectAll('.dot-label').data(RAW.filter(d=>labeled.includes(d.country))).join('text')
+    .attr('class','dot-label').attr('x',d=>xS(d.beer_servings)+rS(d.total_litres_of_pure_alcohol)+3)
+    .attr('y',d=>yS(d.spirit_servings)+4)
+    .attr('fill','rgba(212,184,150,0.6)').attr('font-family','JetBrains Mono').attr('font-size','9')
+    .text(d=>d.country);
+  circles.on('mouseenter',(event,d)=>showTT(d,event)).on('mouseleave',hideTT);
+})();
+
+// ─ DISTRIBUTION ─
+(function(){
+  const svg=d3.select('#dist-svg');
+  const W=800,H=180,padX=40;
+  const vals=RAW.map(d=>d.total_litres_of_pure_alcohol).sort((a,b)=>a-b);
+  const xS=d3.scaleLinear().domain([0,15]).range([padX,W-padX]);
+  const binGen=d3.bin().domain([0,15]).thresholds(30);
+  const bins=binGen(vals);
+  const yS=d3.scaleLinear().domain([0,d3.max(bins,b=>b.length)]).range([H-30,10]);
+  const colors=['rgba(212,147,30,','rgba(192,57,43,','rgba(142,68,173,'];
+  svg.selectAll('rect').data(bins).join('rect')
+    .attr('x',d=>xS(d.x0)+1).attr('width',d=>Math.max(0,xS(d.x1)-xS(d.x0)-2))
+    .attr('y',d=>yS(d.length)).attr('height',d=>H-30-yS(d.length))
+    .attr('fill',d=>{
+      const mid=(d.x0+d.x1)/2;
+      if(mid<5)return 'rgba(212,147,30,0.6)';
+      if(mid<10)return 'rgba(192,57,43,0.6)';
+      return 'rgba(142,68,173,0.7)';
+    }).attr('rx',2);
+  // avg line
+  const globalAvg=avg(RAW,'total_litres_of_pure_alcohol');
+  svg.append('line').attr('x1',xS(globalAvg)).attr('x2',xS(globalAvg)).attr('y1',8).attr('y2',H-30).attr('stroke','rgba(232,201,122,0.7)').attr('stroke-width',1.5).attr('stroke-dasharray','3,3');
+})();
+
+// ─ SECTION 4: DRINK TYPE CHARTS ─
+makeBarChart('bar-beer',topN('beer_servings',12),d=>d.beer_servings,()=>'var(--beer)',400);
+makeBarChart('bar-spirits',topN('spirit_servings',12),d=>d.spirit_servings,()=>'var(--spirits)',450);
+makeBarChart('bar-wine',topN('wine_servings',16),d=>d.wine_servings,()=>'var(--wine)',380);
+
+// ─ HEATMAP ─
+(function(){
+  const top20=topN('total_litres_of_pure_alcohol',20);
+  const maxB=Math.max(...top20.map(d=>d.beer_servings));
+  const maxS=Math.max(...top20.map(d=>d.spirit_servings));
+  const maxW=Math.max(...top20.map(d=>d.wine_servings));
+  const maxT=Math.max(...top20.map(d=>d.total_litres_of_pure_alcohol));
+  function hClass(val,mx){const r=val/mx;if(r<0.1)return'heat-0';if(r<0.3)return'heat-1';if(r<0.5)return'heat-2';if(r<0.7)return'heat-3';if(r<0.85)return'heat-4';return'heat-5';}
+  const tbl=document.getElementById('heatmap-table');
+  tbl.innerHTML=`<thead><tr><th>Country</th><th>Beer</th><th>Spirits</th><th>Wine</th><th>Total L</th></tr></thead>`;
+  const tb=document.createElement('tbody');
+  top20.forEach(d=>{
+    const tr=document.createElement('tr');
+    tr.innerHTML=`<td>${d.country}</td><td class="${hClass(d.beer_servings,maxB)}">${d.beer_servings}</td><td class="${hClass(d.spirit_servings,maxS)}">${d.spirit_servings}</td><td class="${hClass(d.wine_servings,maxW)}">${d.wine_servings}</td><td class="${hClass(d.total_litres_of_pure_alcohol,maxT)}">${d.total_litres_of_pure_alcohol}</td>`;
+    tr.addEventListener('mouseenter',e=>showTT(d,e));
+    tr.addEventListener('mouseleave',hideTT);
+    tb.appendChild(tr);
+  });
+  tbl.appendChild(tb);
+})();
+
+// ─ WORLD MAP ─
+const MAP_CONFIG={
+  total:{key:'total_litres_of_pure_alcohol',max:14.4,colors:['#1a1714','#6b3c14','#d4931e'],label:'Litres pure alcohol / person / yr'},
+  beer:{key:'beer_servings',max:376,colors:['#1a1714','#5a3a0a','#d4931e'],label:'Beer servings / year'},
+  spirits:{key:'spirit_servings',max:438,colors:['#1a1714','#5a1a14','#c0392b'],label:'Spirit servings / year'},
+  wine:{key:'wine_servings',max:370,colors:['#1a1714','#3d1a54','#8e44ad'],label:'Wine servings / year'}
+};
+const NAME_MAP={'united states of america':'USA','russia':'Russian Federation','south korea':'South Korea','north korea':'North Korea','czechia':'Czech Republic','united republic of tanzania':'Tanzania','democratic republic of the congo':'DR Congo','republic of the congo':'Congo',"côte d'ivoire":"Cote d'Ivoire",'ivory coast':"Cote d'Ivoire",'cape verde':'Cabo Verde','swaziland':'Swaziland','eswatini':'Swaziland','trinidad and tobago':'Trinidad & Tobago','antigua and barbuda':'Antigua & Barbuda','saint kitts and nevis':'St. Kitts & Nevis','saint lucia':'St. Lucia','saint vincent and the grenadines':'St. Vincent & the Grenadines','sao tome and principe':'Sao Tome & Principe','bosnia and herzegovina':'Bosnia-Herzegovina','republic of moldova':'Moldova','moldova':'Moldova','north macedonia':'Macedonia','guinea-bissau':'Guinea-Bissau','equatorial guinea':'Equatorial Guinea','central african republic':'Central African Republic','papua new guinea':'Papua New Guinea','solomon islands':'Solomon Islands','marshall islands':'Marshall Islands','timor-leste':'Timor-Leste'};
+const mapLookup={};RAW.forEach(d=>{mapLookup[d.country.toLowerCase()]=d});
+let currentMapMetric='total';
+function renderLegend(m){
+  const cfg=MAP_CONFIG[m];
+  const steps=7;
+  const cScale=d3.scaleLinear().domain([0,cfg.max]).range([cfg.colors[0],cfg.colors[2]]);
+  let swatches='';
+  for(let i=0;i<steps;i++)swatches+=`<span style="display:inline-block;width:24px;height:8px;background:${cScale(cfg.max*i/(steps-1))}"></span>`;
+  document.getElementById('map-legend').innerHTML=`<span>0</span>${swatches}<span>${cfg.max}+</span><span style="margin-left:12px;font-size:8px;opacity:0.5">${cfg.label}</span>`;
+}
+function renderMap(m){
+  renderLegend(m);
+  const cfg=MAP_CONFIG[m];
+  const wrap=document.getElementById('map-wrap');
+  wrap.innerHTML='<div id="map-loading" style="padding:40px;text-align:center;font-family:JetBrains Mono,monospace;font-size:11px;color:var(--dim)">Loading…</div>';
+  d3.json('https://cdn.jsdelivr.net/npm/world-atlas@2/countries-110m.json').then(world=>{
+    wrap.innerHTML='';
+    const W=wrap.clientWidth||960,H=Math.round(W*0.5);
+    const proj=d3.geoNaturalEarth1().scale(W/6.1).translate([W/2,H/2]);
+    const path=d3.geoPath().projection(proj);
+    const cScale=d3.scaleLinear().domain([0,cfg.max]).range([cfg.colors[0],cfg.colors[2]]).clamp(true);
+    const svg=d3.select(wrap).append('svg').attr('viewBox',`0 0 ${W} ${H}`).attr('width','100%').style('display','block');
+    svg.selectAll('path').data(topojson.feature(world,world.objects.countries).features).join('path')
+      .attr('d',path)
+      .attr('fill',feat=>{
+        const n=(feat.properties.name||'').toLowerCase();
+        const rec=mapLookup[NAME_MAP[n]?.toLowerCase()]||mapLookup[n];
+        return rec?cScale(rec[cfg.key]):'#1e1b17';
+      })
+      .attr('stroke','rgba(255,240,200,0.06)').attr('stroke-width',0.4).style('cursor','pointer')
+      .on('mouseenter',(event,feat)=>{
+        const n=(feat.properties.name||'').toLowerCase();
+        const rec=mapLookup[NAME_MAP[n]?.toLowerCase()]||mapLookup[n];
+        if(rec)showTT(rec,event);
+        d3.select(event.currentTarget).attr('stroke','rgba(255,240,200,0.4)').attr('stroke-width',1.2);
+      })
+      .on('mouseleave',event=>{hideTT();d3.select(event.currentTarget).attr('stroke','rgba(255,240,200,0.06)').attr('stroke-width',0.4)});
+  }).catch(()=>{wrap.innerHTML='<div style="padding:24px;font-family:JetBrains Mono,monospace;font-size:11px;color:var(--dim)">Map unavailable — check your connection.</div>'});
+}
+renderMap('total');
+window.setMap=(m,btn)=>{
+  document.querySelectorAll('.map-btn').forEach(b=>b.classList.remove('on'));
+  btn.classList.add('on');currentMapMetric=m;renderMap(m);
+};
+
+// ─ TABLE ─
+let tSort='total_litres_of_pure_alcohol',tDir=-1,tPage=0,tQ='',tRegion='all';
+const PER=18;
+function updateTable(){
+  tQ=document.getElementById('tbl-search').value.toLowerCase();
+  tPage=0;renderTable();
+}
+window.updateTable=updateTable;
+function setFilter(r,btn){
+  document.querySelectorAll('.tbl-f-btn').forEach(b=>b.classList.remove('on'));
+  btn.classList.add('on');tRegion=r;tPage=0;renderTable();
+}
+window.setFilter=setFilter;
+function sortTable(k){
+  if(tSort===k)tDir*=-1;else{tSort=k;tDir=-1;}tPage=0;renderTable();
+}
+window.sortTable=sortTable;
+function goPage(p){tPage=p;renderTable();}
+window.goPage=goPage;
+function renderTable(){
+  let rows=[...RAW];
+  if(tRegion!=='all')rows=rows.filter(d=>d.region===tRegion);
+  if(tQ)rows=rows.filter(d=>d.country.toLowerCase().includes(tQ)||d.region.toLowerCase().includes(tQ));
+  rows.sort((a,b)=>{
+    if(tSort==='country')return tDir*a.country.localeCompare(b.country);
+    if(tSort==='region')return tDir*a.region.localeCompare(b.region);
+    if(tSort==='dominant')return tDir*a.dominant.localeCompare(b.dominant);
+    return tDir*(b[tSort]-a[tSort]);
+  });
+  document.getElementById('tbl-count').textContent=rows.length+' countries';
+  const pg=rows.slice(tPage*PER,(tPage+1)*PER);
+  const maxB2=376,maxS2=438,maxW2=370;
+  const tb=document.getElementById('tbl-body');
+  tb.innerHTML=pg.map(d=>`
+    <tr>
+      <td>${d.country}</td>
+      <td style="font-size:11px;color:var(--dim)">${d.region}</td>
+      <td><span class="pill-dom pill-${d.dominant}">${d.dominant}</span></td>
+      <td class="num"><span class="mini-spark"><span style="height:${Math.max(3,d.beer_servings/maxB2*14)}px;background:var(--beer)"></span></span>${d.beer_servings}</td>
+      <td class="num"><span class="mini-spark"><span style="height:${Math.max(3,d.spirit_servings/maxS2*14)}px;background:var(--spirits)"></span></span>${d.spirit_servings}</td>
+      <td class="num"><span class="mini-spark"><span style="height:${Math.max(3,d.wine_servings/maxW2*14)}px;background:var(--wine)"></span></span>${d.wine_servings}</td>
+      <td class="num" style="color:var(--gold);font-weight:500">${d.total_litres_of_pure_alcohol.toFixed(1)}</td>
+    </tr>`).join('');
+  const total=Math.ceil(rows.length/PER);
+  document.getElementById('tbl-page-info').textContent=`Page ${tPage+1} of ${total} · ${rows.length} rows`;
+  let btns='';
+  if(tPage>0)btns+=`<button class="pg-b" onclick="goPage(${tPage-1})">←</button>`;
+  const start=Math.max(0,tPage-2),end=Math.min(total-1,tPage+2);
+  for(let p=start;p<=end;p++)btns+=`<button class="pg-b ${p===tPage?'on':''}" onclick="goPage(${p})">${p+1}</button>`;
+  if(tPage<total-1)btns+=`<button class="pg-b" onclick="goPage(${tPage+1})">→</button>`;
+  document.getElementById('tbl-pg-btns').innerHTML=btns;
+  // sort indicators
+  ['country','region','dominant','beer','spirits','wine','total'].forEach(k=>{
+    const colMap={country:'country',region:'region',dominant:'dominant',beer:'beer_servings',spirits:'spirit_servings',wine:'wine_servings',total:'total_litres_of_pure_alcohol'};
+    const th=document.getElementById('th-'+k);
+    if(th)th.className=colMap[k]===tSort?(tDir===1?'sort-a':'sort-d'):'';
+  });
+}
+renderTable();
+</script>
+</body>
+</html>

@@ -115,21 +115,6 @@ The entire project is **one HTML file** (`drinks_deep.html`). All 193 country re
 
 ---
 
-## Project Structure
-
-```
-proof-drinks-viz/
-│
-├── drinks_deep.html      # The entire project — open this in a browser
-├── drinks.csv            # Source dataset (193 rows × 5 columns)
-├── README.md             # This file
-├── LICENSE               # MIT
-├── .gitignore
-└── preview.png           # Screenshot for README / LinkedIn thumbnail
-```
-
----
-
 ## Dataset
 
 
@@ -144,49 +129,6 @@ proof-drinks-viz/
 **Records:** 193 countries  
 **Nulls:** None — 13 countries legitimately report 0 across all categories  
 **Coverage:** Circa 2010–2014 (WHO reporting window)
-
----
-
-## Getting Started
-
-### Option 1 — Just open it (fastest)
-
-```bash
-git clone https://github.com/myracorreia05/Global-Alcohol-Consumption-Data-Dashboard.git
-cd Global-Alcohol-Consumption-Data-Dashboard
-open drinks_deep.html        # macOS
-# or: xdg-open drinks_deep.html   (Linux)
-# or: start drinks_deep.html      (Windows)
-```
-
-No install. No server. No dependencies. It opens in your browser and works immediately.
-
-### Option 2 — Local server (if you prefer)
-
-```bash
-# Python
-python3 -m http.server 8080
-
-# Node
-npx serve .
-```
-
-Then visit `http://localhost:8080/drinks_deep.html`
-
----
-
-## Deploying to GitHub Pages
-
-1. Push this repo to GitHub
-2. Go to **Settings → Pages**
-3. Under "Source", select **Deploy from a branch**
-4. Choose `main` branch, `/ (root)` folder
-5. Click **Save**
-
-GitHub will provide a live URL within ~60 seconds:
-```
-https://myracorreia05.github.io/Global-Alcohol-Consumption-Data-Dashboard/drinks_deep.html
-```
 
 ---
 
@@ -211,29 +153,4 @@ BBA + LLB, University of Mumbai · Former Business Analyst at Limeneal Solutions
 
 I build data projects at the intersection of analytics, storytelling, and engineering.
 
-🔗 [Portfolio](https://myracorreia05.github.io) · [LinkedIn](https://linkedin.com/in/myra-correia) · [GitHub](https://github.com/myracorreia05)
 
----
-
-## License
-
-MIT License — free to use, fork, and build on. See [LICENSE](LICENSE) for full text.
-
----
-
-## Acknowledgements
-
-- Dataset: [FiveThirtyEight](https://github.com/fivethirtyeight/data/tree/master/alcohol-consumption) / Mona Chalabi / WHO
-- World topology: [world-atlas](https://github.com/topojson/world-atlas) by Mike Bostock
-- Visualisation library: [D3.js](https://d3js.org/) by Observable
-- Typography: [Cormorant Garamond](https://fonts.google.com/specimen/Cormorant+Garamond) + [JetBrains Mono](https://fonts.google.com/specimen/JetBrains+Mono)
-
----
-
-<div align="center">
-
-Built with curiosity · Powered by open data · Zero npm install required
-
-**[View Live →](https://myracorreia05.github.io/Global-Alcohol-Consumption-Data-Dashboard/)**
-
-</div>

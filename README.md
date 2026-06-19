@@ -3,7 +3,7 @@
 **An interactive data journalism project exploring alcohol consumption patterns across 193 countries**
 
 
-![PROOF Dashboard Preview]
+
 </div>
 
 ---
